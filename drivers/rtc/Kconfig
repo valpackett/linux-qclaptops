@@ -1451,6 +1451,15 @@ config RTC_DRV_NTXEC
 	  embedded controller found in certain e-book readers designed by the
 	  original design manufacturer Netronix.
 
+config RTC_DRV_SURFACE
+	tristate "Microsoft Surface Aggregator RTC"
+	depends on SURFACE_AGGREGATOR
+	depends on SURFACE_AGGREGATOR_BUS
+	help
+	  Say yes here if you want to support the RTC functionality of the
+	  Surface Aggregator Module (embedded controller) found in the
+	  Microsoft Surface Pro X tablet.
+
 comment "on-CPU RTC drivers"
 
 config RTC_DRV_ASM9260

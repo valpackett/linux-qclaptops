@@ -18689,6 +18689,14 @@ L:	platform-driver-x86@vger.kernel.org
 S:	Supported
 F:	drivers/platform/surface/surfacepro3_button.c
 
+MICROSOFT SURFACE PRO X RTC DRIVER
+M:	Maximilian Luz <luzmaximilian@gmail.com>
+M:	Val Packett <val@packett.cool>
+L:	linux-rtc@vger.kernel.org
+L:	linux-arm-msm@vger.kernel.org
+S:	Maintained
+F:	drivers/rtc/rtc-surface.c
+
 MICROSOFT SURFACE SYSTEM AGGREGATOR HUB DRIVER
 M:	Maximilian Luz <luzmaximilian@gmail.com>
 L:	platform-driver-x86@vger.kernel.org
