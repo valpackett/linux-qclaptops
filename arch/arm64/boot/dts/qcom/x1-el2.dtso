@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include <dt-bindings/firmware/qcom,scm.h>
 
 /*
  * x1 specific modifications required to boot in EL2.
@@ -17,8 +18,13 @@
 };
 
 &iris {
-	/* TODO: Add video-firmware iommus to start IRIS from EL2 */
-	status = "disabled";
+	/* Use generic firmware in EL2 and enable it by default */
+	status = "okay";
+	firmware-name = "qcom/vpu/vpu30_p4.mbn";
+
+	video-firmware {
+		iommus = <&apps_smmu 0x1942 0x0>;
+	};
 };
 
 /*
@@ -54,10 +60,12 @@
 
 &remoteproc_adsp {
 	iommus = <&apps_smmu 0x1000 0x80>;
+	qcom,broken-reset;
 };
 
 &remoteproc_cdsp {
 	iommus = <&apps_smmu 0x0c00 0x0>;
+	qcom,broken-reset;
 };
 
 /*
@@ -66,4 +74,8 @@
  */
 &sbsa_watchdog {
 	status = "disabled";
+};
+
+&scm {
+	qcom,shm-bridge-vmid = <QCOM_SCM_VMID_SELF_OWNER>;
 };
