@@ -375,6 +375,17 @@ static void pcie_set_clkpm(struct pcie_link_state *link, int enable)
 	pcie_set_clkpm_nocheck(link, enable);
 }
 
+static void pcie_clkpm_override_default_link_state(struct pcie_link_state *link, int enabled)
+{
+	struct pci_dev *pdev = link->downstream;
+
+	/* For devicetree platforms, enable ClockPM by default */
+	if (of_have_populated_dt() && !enabled && aspm_force) {
+		link->clkpm_default = 1;
+		pci_info(pdev, "ASPM: DT platform, force, enabling ClockPM\n");
+	}
+}
+
 static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 {
 	int capable = 1, enabled = 1;
@@ -397,6 +408,7 @@ static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 	}
 	link->clkpm_enabled = enabled;
 	link->clkpm_default = enabled;
+	pcie_clkpm_override_default_link_state(link, enabled);
 	link->clkpm_capable = capable;
 	link->clkpm_disable = blacklist ? 1 : 0;
 }
@@ -923,8 +935,11 @@ static void pcie_aspm_override_default_link_state(struct pcie_link_state *link)
 			link->aspm_default |= PCIE_LINK_STATE_L0S;
 		if (link->aspm_support & PCIE_LINK_STATE_L1)
 			link->aspm_default |= PCIE_LINK_STATE_L1;
+		if (aspm_force)
+			link->aspm_default = PCIE_LINK_STATE_ASPM_ALL;
 		override = link->aspm_default & ~link->aspm_enabled;
 		if (override)
+
 			pci_info(pdev, "ASPM: default states%s%s\n",
 				 FLAG(override, L0S, " L0s"),
 				 FLAG(override, L1, " L1"));
