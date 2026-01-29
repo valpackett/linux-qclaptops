@@ -41,6 +41,7 @@ struct qcom_usb_vbus_reg_data {
 	const struct regulator_ops *ops;
 };
 
+// FIXME step size is 25, not 50 on pmi632
 static const unsigned int curr_table[] = {
 	500000, 1000000, 1500000, 2000000, 2500000, 3000000,
 };
