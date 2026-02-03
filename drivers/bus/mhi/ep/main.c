@@ -1106,6 +1106,7 @@ static void mhi_ep_reset_worker(struct work_struct *work)
 	cur_state = mhi_cntrl->mhi_state;
 	mutex_unlock(&mhi_cntrl->state_lock);
 
+	mutex_unlock(&mhi_cntrl->state_lock);
 	/*
 	 * Only proceed further if the reset is due to SYS_ERR. The host will
 	 * issue reset during shutdown also and we don't need to do re-init in
