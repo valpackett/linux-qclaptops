@@ -1126,7 +1126,9 @@ void mhi_ep_handle_syserr(struct mhi_ep_cntrl *mhi_cntrl)
 	struct device *dev = &mhi_cntrl->mhi_dev->dev;
 	int ret;
 
+	mutex_lock(&mhi_cntrl->state_lock);
 	ret = mhi_ep_set_mhi_state(mhi_cntrl, MHI_STATE_SYS_ERR);
+	mutex_unlock(&mhi_cntrl->state_lock);
 	if (ret)
 		return;
 
