@@ -2563,7 +2563,7 @@ static struct gdsc bps_gdsc = {
 	},
 	.pwrsts = PWRSTS_OFF_ON,
 	.parent = &titan_top_gdsc.pd,
-	.flags = POLL_CFG_GDSCR,
+	.flags = HW_CTRL | POLL_CFG_GDSCR,
 };
 
 static struct gdsc ife_0_gdsc = {
@@ -2628,7 +2628,7 @@ static struct gdsc ipe_0_gdsc = {
 	},
 	.pwrsts = PWRSTS_OFF_ON,
 	.parent = &titan_top_gdsc.pd,
-	.flags = POLL_CFG_GDSCR,
+	.flags = HW_CTRL | POLL_CFG_GDSCR,
 };
 
 static struct gdsc ipe_1_gdsc = {
@@ -2641,7 +2641,7 @@ static struct gdsc ipe_1_gdsc = {
 	},
 	.pwrsts = PWRSTS_OFF_ON,
 	.parent = &titan_top_gdsc.pd,
-	.flags = POLL_CFG_GDSCR,
+	.flags = HW_CTRL | POLL_CFG_GDSCR,
 };
 
 static struct clk_regmap *cam_cc_sc8180x_clocks[] = {
