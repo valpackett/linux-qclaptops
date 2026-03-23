@@ -677,7 +677,7 @@ static int hx83102j_sense_off(struct himax_ts_data *ts, bool check_en)
 			// ret = himax_mcu_register_write(ts, HIMAX_REG_ADDR_CTRL_FW,
 			// 			       safe_mode.byte, 4);
 			const union himax_dword_data target_addr = {
-				.dword = cpu_to_le32(HIMAX_REG_ADDR_CTRL_FW);
+				.dword = cpu_to_le32(HIMAX_REG_ADDR_CTRL_FW),
 			};
 			ret = himax_write(ts, HIMAX_AHB_ADDR_BYTE_0,
 					  target_addr.byte, safe_mode.byte, 8);
