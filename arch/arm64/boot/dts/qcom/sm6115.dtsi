@@ -842,6 +842,74 @@
 			#gpio-cells = <2>;
 			gpio-ranges = <&lpass_tlmm 0 0 19>;
 
+			lpi_i2s1_active: lpi-i2s1-active-state {
+				sck-pins {
+					pins = "gpio6";
+					function = "i2s1_clk";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				ws-pins {
+					pins = "gpio7";
+					function = "i2s1_ws";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				data-pins {
+					pins = "gpio8", "gpio9";
+					function = "i2s1_data";
+					bias-disable;
+					drive-strength = <8>;
+				};
+			};
+
+			lpi_i2s2_active: lpi-i2s2-active-state {
+				sck-pins {
+					pins = "gpio10";
+					function = "i2s2_clk";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				ws-pins {
+					pins = "gpio11";
+					function = "i2s2_ws";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				data-pins {
+					pins = "gpio12", "gpio13";
+					function = "i2s2_data";
+					bias-disable;
+					drive-strength = <8>;
+				};
+			};
+
+			lpi_i2s3_active: lpi-i2s3-active-state {
+				sck-pins {
+					pins = "gpio14";
+					function = "i2s3_clk";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				ws-pins {
+					pins = "gpio15";
+					function = "i2s3_ws";
+					bias-disable;
+					drive-strength = <8>;
+				};
+
+				data-pins {
+					pins = "gpio16", "gpio17";
+					function = "i2s3_data";
+					bias-disable;
+					drive-strength = <8>;
+				};
+			};
 		};
 
 		gcc: clock-controller@1400000 {
