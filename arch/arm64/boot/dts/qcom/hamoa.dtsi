@@ -5314,6 +5314,8 @@
 			snps,dis-u1-entry-quirk;
 			snps,dis-u2-entry-quirk;
 
+			usb-role-switch;
+
 			dma-coherent;
 
 			status = "disabled";
@@ -5552,6 +5554,8 @@
 			snps,dis-u1-entry-quirk;
 			snps,dis-u2-entry-quirk;
 
+			usb-role-switch;
+
 			dma-coherent;
 
 			status = "disabled";
@@ -5642,6 +5646,8 @@
 			snps,usb3_lpm_capable;
 			snps,dis-u1-entry-quirk;
 			snps,dis-u2-entry-quirk;
+
+			usb-role-switch;
 
 			dma-coherent;
 
