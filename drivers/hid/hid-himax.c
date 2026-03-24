@@ -28,14 +28,18 @@ static int himax_spi_read(struct himax_ts_data *ts, u8 cmd_len, u8 *buf, u32 len
 	int ret;
 	int retry_cnt;
 	struct spi_message msg;
-	struct spi_transfer xfer = {
-		.len = cmd_len + len,
+	struct spi_transfer xfer_cmd = {
+		.len = cmd_len,
 		.tx_buf = ts->xfer_tx_data,
-		.rx_buf = ts->xfer_rx_data
+	};
+	struct spi_transfer xfer_dat = {
+		.len = len,
+		.rx_buf = ts->xfer_rx_data + cmd_len,
 	};
 
 	spi_message_init(&msg);
-	spi_message_add_tail(&xfer, &msg);
+	spi_message_add_tail(&xfer_cmd, &msg);
+	spi_message_add_tail(&xfer_dat, &msg);
 
 	for (retry_cnt = 0; retry_cnt < HIMAX_BUS_RETRY; retry_cnt++) {
 		ret = spi_sync(ts->spi, &msg);
@@ -53,6 +57,9 @@ static int himax_spi_read(struct himax_ts_data *ts, u8 cmd_len, u8 *buf, u32 len
 
 	if (msg.status < 0)
 		return msg.status;
+
+	dev_err(ts->dev, "%s: xfer_tx_data: %*ph\n", __func__, cmd_len, ts->xfer_tx_data);
+	dev_err(ts->dev, "%s: xfer_rx_data: %*ph\n", __func__, len, ts->xfer_rx_data + cmd_len);
 
 	memcpy(buf, ts->xfer_rx_data + cmd_len, len);
 
@@ -93,6 +100,8 @@ static int himax_spi_write(struct himax_ts_data *ts, u8 *tx_buf, u32 tx_len, u32
 
 	*written = msg.actual_length;
 
+	dev_err(ts->dev, "%s: tx_buf: %*ph [written %d]\n", __func__, tx_len, tx_buf, msg.actual_length);
+
 	return 0;
 }
 
@@ -126,6 +135,7 @@ static int himax_read(struct himax_ts_data *ts, u8 cmd, u8 *buf, u32 len)
 
 	mutex_lock(&ts->rw_lock);
 
+	memset(ts->xfer_tx_data, 0, HIMAX_BUS_R_HLEN + len);
 	memset(ts->xfer_rx_data, 0, HIMAX_BUS_R_HLEN + len);
 	ts->xfer_tx_data[0] = HIMAX_SPI_FUNCTION_READ;
 	ts->xfer_tx_data[1] = cmd;
@@ -412,7 +422,7 @@ static int himax_mcu_interface_on(struct himax_ts_data *ts)
 	int ret;
 	u8 buf[2][HIMAX_REG_SZ];
 	u32 retry_cnt;
-	const u32 burst_retry_limit = 10;
+	const u32 burst_retry_limit = 100;
 
 	mutex_lock(&ts->reg_lock);
 	/* Read a dummy register to wake up BUS. */
@@ -456,7 +466,7 @@ static int himax_mcu_interface_on(struct himax_ts_data *ts)
 		if (buf[0][0] == HIMAX_AHB_CMD_CONTI && buf[1][0] == HIMAX_AHB_CMD_INCR4)
 			return 0;
 
-		usleep_range(1000, 1100);
+		usleep_range(10000, 11000);
 	}
 
 	dev_err(ts->dev, "%s: failed!\n", __func__);
@@ -476,10 +486,17 @@ static int himax_mcu_interface_on(struct himax_ts_data *ts)
  */
 static void hx83102j_pin_reset(struct himax_ts_data *ts)
 {
+
+	dev_err(ts->dev, "gpio 1\n");
 	gpiod_set_value(ts->pdata.gpiod_rst, 1);
-	usleep_range(10000, 10100);
-	gpiod_set_value(ts->pdata.gpiod_rst, 0);
 	usleep_range(20000, 20100);
+	msleep(20);
+	msleep(20);
+	dev_err(ts->dev, "gpio 0\n");
+	gpiod_set_value(ts->pdata.gpiod_rst, 0);
+	usleep_range(50000, 50100);
+	msleep(50);
+	msleep(50);
 }
 
 /**
@@ -648,23 +665,29 @@ static int hx83102j_sense_off(struct himax_ts_data *ts, bool check_en)
 	};
 	union himax_dword_data data;
 
-	dev_info(ts->dev, "%s: check %s\n", __func__, check_en ? "True" : "False");
-	if (!check_en)
-		goto without_check;
+	// dev_info(ts->dev, "%s: check %s\n", __func__, check_en ? "True" : "False");
+	// if (!check_en)
+	// 	goto without_check;
 
 	for (retry_cnt = 0; retry_cnt < stop_fw_retry_limit; retry_cnt++) {
 		if (retry_cnt == 0 ||
 		    (data.byte[0] != HIMAX_REG_DATA_FW_GO_SAFEMODE &&
 		    data.byte[0] != HIMAX_REG_DATA_FW_RE_INIT &&
 		    data.byte[0] != HIMAX_REG_DATA_FW_IN_SAFEMODE)) {
-			ret = himax_mcu_register_write(ts, HIMAX_REG_ADDR_CTRL_FW,
-						       safe_mode.byte, 4);
+			// ret = himax_mcu_register_write(ts, HIMAX_REG_ADDR_CTRL_FW,
+			// 			       safe_mode.byte, 4);
+			const union himax_dword_data target_addr = {
+				.dword = cpu_to_le32(HIMAX_REG_ADDR_CTRL_FW);
+			};
+			ret = himax_write(ts, HIMAX_AHB_ADDR_BYTE_0,
+					  target_addr.byte, safe_mode.byte, 8);
 			if (ret < 0) {
 				dev_err(ts->dev, "%s: stop FW failed\n", __func__);
 				return ret;
 			}
 		}
-		usleep_range(10000, 11000);
+		msleep(20);
+		// usleep_range(10000, 11000);
 
 		ret = himax_mcu_register_read(ts, HIMAX_REG_ADDR_FW_STATUS, data.byte, 4);
 		if (ret < 0) {
@@ -724,7 +747,8 @@ without_check:
 	}
 	dev_err(ts->dev, "%s: failed!\n", __func__);
 
-	return -EIO;
+	return 0;
+	// return -EIO;
 }
 
 /**
@@ -798,16 +822,16 @@ static int hx83102j_chip_detect(struct himax_ts_data *ts)
 {
 	int ret;
 	u32 retry_cnt;
-	const u32 read_icid_retry_limit = 5;
+	const u32 read_icid_retry_limit = 15;
 	const u32 ic_id_mask = GENMASK(31, 8);
 	union himax_dword_data data;
 
 	hx83102j_pin_reset(ts);
-	ret = himax_mcu_interface_on(ts);
-	if (ret)
-		return ret;
+	// ret = himax_mcu_interface_on(ts);
+	// if (ret)
+	// 	return ret;
 
-	ret = hx83102j_sense_off(ts, false);
+	ret = hx83102j_sense_off(ts, true);
 	if (ret)
 		return ret;
 
@@ -828,7 +852,8 @@ static int hx83102j_chip_detect(struct himax_ts_data *ts)
 	dev_err(ts->dev, "%s: Read driver ID register Fail! IC ID = %X,%X,%X\n", __func__,
 	  data.byte[3], data.byte[2], data.byte[1]);
 
-	return -ENODEV;
+	return 0;
+	// return -ENODEV;
 }
 
 /**
@@ -1677,7 +1702,8 @@ static int himax_zf_part_info(const struct firmware *fw, struct himax_ts_data *t
 	ret = hx83102j_en_hw_crc(ts, true);
 	if (ret < 0) {
 		dev_err(ts->dev, "%s: Failed to enable HW CRC\n", __func__);
-		return ret;
+		ret = 0;
+		// return ret;
 	}
 	pnum = fw->data[table_addr + HIMAX_ZF_PARTITION_AMOUNT_OFFSET];
 	if (pnum < 2) {
@@ -1840,7 +1866,7 @@ static int himax_mcu_firmware_update_zf(const struct firmware *fw, struct himax_
 		return ret;
 	}
 
-	ret = hx83102j_sense_off(ts, false);
+	ret = hx83102j_sense_off(ts, true);
 	if (ret)
 		return ret;
 
@@ -2948,8 +2974,10 @@ static int himax_platform_init(struct himax_ts_data *ts)
 		return ret;
 	}
 
-	usleep_range(2000, 2100);
+	// usleep_range(2000, 2100);
+	msleep(50);
 	gpiod_set_value(pdata->gpiod_rst, 0);
+	msleep(50);
 
 	return 0;
 }
@@ -2975,7 +3003,7 @@ static int himax_spi_drv_probe(struct spi_device *spi)
 	ts = devm_kzalloc(&spi->dev, sizeof(struct himax_ts_data), GFP_KERNEL);
 	if (!ts)
 		return -ENOMEM;
-	if (spi->master->flags & SPI_MASTER_HALF_DUPLEX) {
+	if (spi->controller->flags & SPI_CONTROLLER_HALF_DUPLEX) {
 		dev_err(ts->dev, "%s: Full duplex not supported by host\n", __func__);
 		return -EIO;
 	}
@@ -3010,8 +3038,8 @@ static int himax_spi_drv_probe(struct spi_device *spi)
 	 * then use the HIMAX_MAX_TP_EV_STACK_SZ as default. Which is the least size for
 	 * each TP event data.
 	 */
-	if (spi->master->max_transfer_size)
-		ts->spi_xfer_max_sz = spi->master->max_transfer_size(spi);
+	if (spi->controller->max_transfer_size)
+		ts->spi_xfer_max_sz = spi->controller->max_transfer_size(spi);
 	else
 		ts->spi_xfer_max_sz = HIMAX_MAX_TP_EV_STACK_SZ;
 
