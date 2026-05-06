@@ -100,6 +100,22 @@
 		};
 	};
 
+	disp_dvdd_1p25: disp-dvdd-1p25-regulator {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_dvdd_1p25";
+		regulator-min-microvolt = <1250000>;
+		regulator-max-microvolt = <1250000>;
+
+		gpio = <&tlmm 19 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		vin-supply = <&vreg_bob>;
+
+		pinctrl-0 = <&disp_ldo_en_active>;
+		pinctrl-names = "default";
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -895,6 +911,47 @@
 	clock-output-names = "fsgen";
 };
 
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi {
+	vdda-supply = <&vdd_a_dsi_0_1p2>;
+	status = "okay";
+
+	panel: panel@0 {
+		reg = <0>;
+
+		reset-gpios = <&tlmm 44 GPIO_ACTIVE_LOW>;
+
+		dvdd-supply = <&disp_dvdd_1p25>;
+		vdd-supply = <&disp_vci_3p0>;
+		vddio-supply = <&disp_iovcc_1p8>;
+
+		pinctrl-0 = <&oled_reset_n>,
+			    <&mdp_vsync_p>;
+		pinctrl-names = "default";
+
+		status = "disabled";
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi_phy {
+	vdds-supply = <&vdd_a_dsi_0_0p9>;
+	status = "okay";
+};
+
 &pm7250b_adc {
 	channel@4e {
 		reg = <ADC5_AMUX_THM2_100K_PU>;
@@ -1583,6 +1640,13 @@
 			  "NC";
 	gpio-reserved-ranges = <48 4>, /* SPI (eSE - embedded Secure Element) */
 			       <56 4>; /* SPI (fingerprint reader) */
+
+	disp_ldo_en_active: disp-ldo-en-active-state {
+		pins = "gpio19";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 
 	qup_uart7_sleep_cts: qup-uart7-sleep-cts-state {
 		pins = "gpio28";
