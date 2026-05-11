@@ -1466,6 +1466,13 @@ void msm_dp_display_atomic_disable(struct msm_dp *dp)
 
 	msm_dp_display = container_of(dp, struct msm_dp_display_private, msm_dp_display);
 
+	/*
+	 * push_idle accesses link registers which require link clocks to be on.
+	 * Skip if the display was never powered on (e.g. eDP with no panel).
+	 */
+	if (!dp->power_on)
+		return;
+
 	msm_dp_ctrl_push_idle(msm_dp_display->ctrl);
 }
 
