@@ -263,8 +263,11 @@ int msm_dp_panel_read_link_caps(struct msm_dp_panel *msm_dp_panel,
 
 	if (drm_dp_is_branch(msm_dp_panel->dpcd)) {
 		count = drm_dp_read_sink_count(panel->aux);
+		if (count < 0)
+			return count;
+
+		panel->link->sink_count = count;
 		if (!count) {
-			panel->link->sink_count = 0;
 			return -ENOTCONN;
 		}
 	}
