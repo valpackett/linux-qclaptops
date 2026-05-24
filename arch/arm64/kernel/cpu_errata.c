@@ -12,6 +12,7 @@
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
 #include <asm/fpsimd.h>
+#include <asm/hypervisor.h>
 #include <asm/kvm_asm.h>
 #include <asm/smp_plat.h>
 
@@ -657,6 +658,22 @@ static const struct midr_range cnp_erratum_cpus[] = {
 };
 #endif
 
+static const struct midr_range qcom_oryon_list[] = {
+	MIDR_ALL_VERSIONS(MIDR_QCOM_ORYON_X1),
+	{}
+};
+
+static bool qcom_oryon_has_broken_dc_zva(const struct arm64_cpu_capabilities *entry, int scope)
+{
+	return (is_midr_in_range_list(qcom_oryon_list) &&
+		!kvm_arm_hyp_service_available(ARM_SMCCC_KVM_FUNC_FEATURES));
+}
+
+static void qcom_oryon_disable_dc_zva(const struct arm64_cpu_capabilities *__unused)
+{
+	sysreg_clear_set_s(SYS_SCTLR_EL1, SCTLR_EL1_DZE, 0);
+}
+
 const struct arm64_cpu_capabilities arm64_errata[] = {
 #ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
 	{
@@ -1012,10 +1029,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 	{
 		.desc = "Broken CNTVOFF_EL2",
 		.capability = ARM64_WORKAROUND_QCOM_ORYON_CNTVOFF,
-		ERRATA_MIDR_RANGE_LIST(((const struct midr_range[]) {
-					MIDR_ALL_VERSIONS(MIDR_QCOM_ORYON_X1),
-					{}
-				})),
+		ERRATA_MIDR_RANGE_LIST(qcom_oryon_list),
+	},
+	{
+		.desc = "Broken DC ZVA",
+		.capability = ARM64_WORKAROUND_QCOM_ORYON_DC_ZVA,
+		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+		.matches = qcom_oryon_has_broken_dc_zva,
+		.cpu_enable = qcom_oryon_disable_dc_zva,
 	},
 	{
 		.desc = "Apple IMPDEF PMUv3 Traps",
