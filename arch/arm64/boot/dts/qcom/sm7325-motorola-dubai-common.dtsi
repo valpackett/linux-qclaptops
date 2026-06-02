@@ -116,6 +116,20 @@
 		};
 	};
 
+	cam_dvdd0_1p05: dvdd0-1p05-regulator {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_dvdd0_1p05";
+		regulator-min-microvolt = <1050000>;
+		regulator-max-microvolt = <1050000>;
+		regulator-enable-ramp-delay = <233>;
+
+		gpio = <&tlmm 25 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		vin-supply = <&vreg_s8b_1p256>;
+	};
+
 	cam_dvdd3_1p05: dvdd3-1p05-regulator {
 		compatible = "regulator-fixed";
 
@@ -752,6 +766,13 @@
 				remote-endpoint = <&camera_s5kjn1_ep>;
 			};
 		};
+
+		port@3 {
+			csiphy3_ep: endpoint {
+				data-lanes = <0>;
+				remote-endpoint = <&camera_gc02m1b_ep>;
+			};
+		};
 	};
 };
 
@@ -805,6 +826,42 @@
 				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
 				link-frequencies = /bits/ 64 <700000000>;
 				remote-endpoint = <&csiphy2_ep>;
+			};
+		};
+	};
+};
+
+&cci1 {
+	status = "okay";
+};
+
+&cci1_i2c1 {
+	sensor@37 {
+		compatible = "galaxycore,gc02m1b";
+		reg = <0x37>;
+
+		vddio-supply = <&cam_iovdd_1p8>;
+		vdda-supply = <&cam_avdd2_2p8>;
+
+		clocks = <&camcc CAM_CC_MCLK1_CLK>;
+		assigned-clocks = <&camcc CAM_CC_MCLK1_CLK>;
+		assigned-clock-rates = <24000000>;
+
+		reset-gpios = <&tlmm 78 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&cam_mclk1_default>;
+		pinctrl-names = "default";
+
+		orientation = <MEDIA_ORIENTATION_BACK>;
+		rotation = <90>; /* Not like the other cameras */
+
+		status = "disabled"; /* XXX: wedging cam app while switching cams etc */
+
+		port {
+			camera_gc02m1b_ep: endpoint {
+				data-lanes = <0>;
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				link-frequencies = /bits/ 64 <288000000>;
+				remote-endpoint = <&csiphy3_ep>;
 			};
 		};
 	};
