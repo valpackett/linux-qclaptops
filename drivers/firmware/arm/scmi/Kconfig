@@ -84,6 +84,7 @@ config ARM_SCMI_QUIRKS
 
 source "drivers/firmware/arm/scmi/transports/Kconfig"
 source "drivers/firmware/arm/scmi/vendors/imx/Kconfig"
+source "drivers/firmware/arm/scmi/vendors/qcom/Kconfig"
 
 endif #ARM_SCMI_PROTOCOL
 
