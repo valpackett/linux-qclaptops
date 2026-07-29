@@ -5089,10 +5089,18 @@ static int qmp_combo_typec_switch_set(struct typec_switch_dev *sw,
 		return 0;
 	}
 
-	if (orientation == qmp->orientation || orientation == TYPEC_ORIENTATION_NONE)
+	if (orientation == TYPEC_ORIENTATION_NONE)
 		return 0;
 
 	guard(mutex)(&qmp->phy_mutex);
+
+	/*
+	 * Changing orientation force-cycles the common USB/DP PHY block.
+	 * Defer it until the active DP stream has been powered off.
+	 */
+	if (orientation == qmp->orientation || qmp->dp_powered_on)
+		return 0;
+
 	qmp->orientation = orientation;
 
 	if (qmp->init_count) {
