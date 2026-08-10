@@ -481,7 +481,7 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 	if (ret) {
 		dev_err(hba->dev, "%s: core_reset assert failed, err = %d\n",
 				 __func__, ret);
-		return ret;
+		goto out;
 	}
 
 	/*
@@ -495,15 +495,17 @@ static int ufs_qcom_host_reset(struct ufs_hba *hba)
 	if (ret) {
 		dev_err(hba->dev, "%s: core_reset deassert failed, err = %d\n",
 				 __func__, ret);
-		return ret;
+		goto out;
 	}
 
 	usleep_range(1000, 1100);
 
+	ret = 0;
+out:
 	if (reenable_intr)
 		ufshcd_enable_irq(hba);
 
-	return 0;
+	return ret;
 }
 
 static u32 ufs_qcom_get_hs_gear(struct ufs_hba *hba)
