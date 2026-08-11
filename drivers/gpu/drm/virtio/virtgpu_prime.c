@@ -349,7 +349,8 @@ struct drm_gem_object *virtgpu_gem_prime_import(struct drm_device *dev,
 		}
 	}
 
-	if (!vgdev->has_resource_blob || vgdev->has_virgl_3d)
+	if (!vgdev->has_resource_blob ||
+	    (vgdev->has_virgl_3d && !vgdev->has_blob_guest_shareable))
 		return drm_gem_prime_import(dev, buf);
 
 	bo = kzalloc_obj(*bo);

@@ -122,6 +122,9 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 			return -ENOENT;
 		value = vgdev->blob_alignment;
 		break;
+	case VIRTGPU_PARAM_BLOB_GUEST_SHAREABLE:
+		value = vgdev->has_blob_guest_shareable ? 1 : 0;
+		break;
 	default:
 		return -EINVAL;
 	}

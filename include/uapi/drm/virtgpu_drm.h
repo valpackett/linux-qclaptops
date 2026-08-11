@@ -99,6 +99,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs 7 /* Bitmask of supported capability set ids */
 #define VIRTGPU_PARAM_EXPLICIT_DEBUG_NAME 8 /* Ability to set debug name from userspace */
 #define VIRTGPU_PARAM_BLOB_ALIGNMENT 9 /* Device alignment requirements for blobs */
+#define VIRTGPU_PARAM_BLOB_GUEST_SHAREABLE 10 /* Guest-only blobs can USE_SHAREABLE with 3D ctx */
 
 struct drm_virtgpu_getparam {
 	__u64 param;

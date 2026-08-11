@@ -290,6 +290,7 @@ struct virtio_gpu_device {
 	bool has_context_init;
 	bool has_blob_alignment;
 	bool has_blob_ctx_id_fix;
+	bool has_blob_guest_shareable;
 	bool hibernated;
 	struct virtio_shm_region host_visible_region;
 	struct drm_mm host_visible_mm;
