@@ -183,9 +183,10 @@ struct drm_virtgpu_resource_create_blob {
 #define VIRTGPU_BLOB_MEM_HOST3D            0x0002
 #define VIRTGPU_BLOB_MEM_HOST3D_GUEST      0x0003
 
-#define VIRTGPU_BLOB_FLAG_USE_MAPPABLE     0x0001
-#define VIRTGPU_BLOB_FLAG_USE_SHAREABLE    0x0002
-#define VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE 0x0004
+#define VIRTGPU_BLOB_FLAG_USE_MAPPABLE        0x0001
+#define VIRTGPU_BLOB_FLAG_USE_SHAREABLE       0x0002
+#define VIRTGPU_BLOB_FLAG_USE_CROSS_DEVICE    0x0004
+#define VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE 0x0008
 	/* zero is invalid blob_mem */
 	__u32 blob_mem;
 	__u32 blob_flags;

@@ -72,6 +72,11 @@
  * must be aligned to that value.
  */
 #define VIRTIO_GPU_F_BLOB_ALIGNMENT      5
+/*
+ * VIRTIO_GPU_CMD_RESOURCE_CREATE_BLOB with
+ * VIRTIO_GPU_BLOB_FLAG_CREATE_GUEST_HANDLE
+ */
+#define VIRTIO_GPU_F_CREATE_GUEST_HANDLE 6
 
 enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_UNDEFINED = 0,
