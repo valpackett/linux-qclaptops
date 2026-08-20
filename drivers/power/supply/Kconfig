@@ -1187,13 +1187,13 @@ config BATTERY_CHARGER_SURFACE_RT
 	  will be called surface-rt-ec.
 
 config CHARGER_QCOM_SMB2
-	tristate "Qualcomm PMI8998 PMIC charger driver"
+	tristate "Qualcomm SMB2 and SMB5 charger driver"
 	depends on MFD_SPMI_PMIC
 	depends on IIO
 	help
-	  Say Y here to enable the Qualcomm PMIC Charger driver. This
-	  adds support for the SMB2 switch mode battery charger found
-	  in PMI8998 and related PMICs.
+	  Say Y here to enable the Qualcomm PMIC charger driver. This adds
+	  support for the SMB2 and SMB5 switch-mode battery chargers found
+	  in PMI8998, PM660, PM7250B and PM8150B PMICs.
 
 config FUEL_GAUGE_MM8013
 	tristate "Mitsumi MM8013 fuel gauge driver"
