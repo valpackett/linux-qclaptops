@@ -23,6 +23,13 @@
 #include <linux/types.h>
 #include <linux/workqueue.h>
 
+enum smb_generation {
+	SMB2,
+	SMB5,
+};
+
+#define SMB_REG_OFFSET(smb) ((smb)->gen == SMB2 ? 0x600 : 0x100)
+
 /* clang-format off */
 #define BATTERY_CHARGER_STATUS_1			0x06
 #define BVR_INITIAL_RAMP_BIT				BIT(7)
@@ -34,14 +41,20 @@
 #define BATTERY_CHARGER_STATUS_2			0x07
 #define INPUT_CURRENT_LIMITED_BIT			BIT(7)
 #define CHARGER_ERROR_STATUS_SFT_EXPIRE_BIT		BIT(6)
-#define CHARGER_ERROR_STATUS_BAT_OV_BIT			BIT(5)
+#define SMB2_CHARGER_ERROR_STATUS_BAT_OV_BIT		BIT(5)
 #define CHARGER_ERROR_STATUS_BAT_TERM_MISSING_BIT	BIT(4)
 #define BAT_TEMP_STATUS_MASK				GENMASK(3, 0)
 #define BAT_TEMP_STATUS_SOFT_LIMIT_MASK			GENMASK(3, 2)
-#define BAT_TEMP_STATUS_HOT_SOFT_LIMIT_BIT		BIT(3)
-#define BAT_TEMP_STATUS_COLD_SOFT_LIMIT_BIT		BIT(2)
-#define BAT_TEMP_STATUS_TOO_HOT_BIT			BIT(1)
-#define BAT_TEMP_STATUS_TOO_COLD_BIT			BIT(0)
+#define SMB2_BAT_TEMP_STATUS_HOT_SOFT_LIMIT_BIT		BIT(3)
+#define SMB2_BAT_TEMP_STATUS_COLD_SOFT_LIMIT_BIT	BIT(2)
+#define SMB2_BAT_TEMP_STATUS_TOO_HOT_BIT			BIT(1)
+#define SMB2_BAT_TEMP_STATUS_TOO_COLD_BIT		BIT(0)
+
+#define SMB5_CHARGER_ERROR_STATUS_BAT_OV_BIT		BIT(1)
+#define SMB5_BAT_TEMP_STATUS_HOT_SOFT_BIT		BIT(5)
+#define SMB5_BAT_TEMP_STATUS_COLD_SOFT_BIT		BIT(4)
+#define SMB5_BAT_TEMP_STATUS_TOO_HOT_BIT			BIT(3)
+#define SMB5_BAT_TEMP_STATUS_TOO_COLD_BIT		BIT(2)
 
 #define BATTERY_CHARGER_STATUS_4			0x0A
 #define CHARGE_CURRENT_POST_JEITA_MASK			GENMASK(7, 0)
@@ -78,10 +91,10 @@
 #define FLOAT_VOLTAGE_CFG				0x70
 #define FLOAT_VOLTAGE_SETTING_MASK			GENMASK(7, 0)
 
-#define FG_UPDATE_CFG_2_SEL				0x7D
+#define SMB2_FG_UPDATE_CFG_2_SEL			0x7D
 #define SOC_LT_OTG_THRESH_SEL_BIT			BIT(3)
-#define SOC_LT_CHG_RECHARGE_THRESH_SEL_BIT		BIT(2)
-#define VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT		BIT(1)
+#define SMB2_SOC_LT_CHG_RECHARGE_THRESH_SEL_BIT		BIT(2)
+#define SMB2_VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT		BIT(1)
 #define IBT_LT_CHG_TERM_THRESH_SEL_BIT			BIT(0)
 
 #define JEITA_EN_CFG					0x90
@@ -101,13 +114,13 @@
 #define USBIN_LT_3P6V_RT_STS_BIT			BIT(1)
 #define USBIN_COLLAPSE_RT_STS_BIT			BIT(0)
 
-#define OTG_CFG						0x153
+#define SMB2_OTG_CFG					0x153
 #define OTG_RESERVED_MASK				GENMASK(7, 6)
 #define DIS_OTG_ON_TLIM_BIT				BIT(5)
 #define QUICKSTART_OTG_FASTROLESWAP_BIT			BIT(4)
 #define INCREASE_DFP_TIME_BIT				BIT(3)
 #define ENABLE_OTG_IN_DEBUG_MODE_BIT			BIT(2)
-#define OTG_EN_SRC_CFG_BIT				BIT(1)
+#define SMB2_OTG_EN_SRC_CFG_BIT				BIT(1)
 #define CONCURRENT_MODE_CFG_BIT				BIT(0)
 
 #define OTG_ENG_OTG_CFG					0x1C0
@@ -189,10 +202,12 @@
 #define TYPEC_TRYSINK_DETECT_STATUS_BIT			BIT(0)
 
 #define CMD_APSD					0x341
-#define ICL_OVERRIDE_BIT				BIT(1)
 #define APSD_RERUN_BIT					BIT(0)
 
-#define TYPE_C_CFG					0x358
+#define CMD_ICL_OVERRIDE				0x342
+#define ICL_OVERRIDE_BIT				BIT(0)
+
+#define USBIN_TYPE_C_CFG				0x358
 #define APSD_START_ON_CC_BIT				BIT(7)
 #define WAIT_FOR_APSD_BIT				BIT(6)
 #define FACTORY_MODE_DETECTION_EN_BIT			BIT(5)
@@ -260,7 +275,7 @@
 #define EXIT_SNK_BASED_ON_CC_BIT			BIT(7)
 #define VCONN_EN_ORIENTATION_BIT			BIT(6)
 #define TYPEC_VCONN_OVERCURR_INT_EN_BIT			BIT(5)
-#define VCONN_EN_SRC_BIT				BIT(4)
+#define SMB2_VCONN_EN_SRC_BIT				BIT(4)
 #define VCONN_EN_VALUE_BIT				BIT(3)
 #define TYPEC_POWER_ROLE_CMD_MASK			GENMASK(2, 0)
 #define UFP_EN_CMD_BIT					BIT(2)
@@ -274,7 +289,7 @@
 #define SUSPEND_ON_COLLAPSE_USBIN_BIT			BIT(7)
 #define USBIN_AICL_HDC_EN_BIT				BIT(6)
 #define USBIN_AICL_START_AT_MAX_BIT			BIT(5)
-#define USBIN_AICL_RERUN_EN_BIT				BIT(4)
+#define USBIN_AICL_PERIODIC_RERUN_EN_BIT		BIT(4)
 #define USBIN_AICL_ADC_EN_BIT				BIT(3)
 #define USBIN_AICL_EN_BIT				BIT(2)
 #define USBIN_HV_COLLAPSE_RESPONSE_BIT			BIT(1)
@@ -303,10 +318,12 @@
 #define AICL_SWITCH_ENABLE_BIT				BIT(1)
 #define ZIN_ICL_ENABLE_BIT				BIT(0)
 
-#define ICL_STATUS					0x607
 #define INPUT_CURRENT_LIMIT_MASK			GENMASK(7, 0)
 
-#define POWER_PATH_STATUS				0x60B
+#define SMB2_ICL_STATUS					0x607
+#define SMB5_AICL_ICL_STATUS				0x108
+
+#define POWER_PATH_STATUS(smb)				(SMB_REG_OFFSET(smb) + 0x0B)
 #define P_PATH_INPUT_SS_DONE_BIT			BIT(7)
 #define P_PATH_USBIN_SUSPEND_STS_BIT			BIT(6)
 #define P_PATH_DCIN_SUSPEND_STS_BIT			BIT(5)
@@ -335,6 +352,8 @@
 
 #define AICL_RERUN_TIME_CFG				0x661
 #define AICL_RERUN_TIME_MASK				GENMASK(1, 0)
+#define AICL_RERUN_TIME_3_SECS				0
+#define AICL_RERUN_TIME_12_SECS				1
 
 #define STAT_CFG					0x690
 #define STAT_SW_OVERRIDE_VALUE_BIT			BIT(7)
@@ -350,22 +369,30 @@
 #define DCP_CURRENT_UA					1500000
 #define CURRENT_MAX_UA					DCP_CURRENT_UA
 
-/* pmi8998 registers represent current in increments of 1/40th of an amp */
-#define CURRENT_SCALE_FACTOR				25000
-#define SMB2_FLOAT_VOLTAGE_MIN_UV			3487500
-#define SMB2_FLOAT_VOLTAGE_MAX_UV			4920000
-#define SMB2_FLOAT_VOLTAGE_STEP_UV			7500
+/* PMI8998 registers represent current in increments of 1/40th of an amp. */
+#define SMB2_CURRENT_STEP_UA				25000
 /* clang-format on */
 
-enum charger_status {
-	TRICKLE_CHARGE = 0,
-	PRE_CHARGE,
-	FAST_CHARGE,
-	FULLON_CHARGE,
-	TAPER_CHARGE,
-	TERMINATE_CHARGE,
-	INHIBIT_CHARGE,
-	DISABLE_CHARGE,
+enum smb2_charger_status {
+	SMB2_TRICKLE_CHARGE = 0,
+	SMB2_PRE_CHARGE,
+	SMB2_FAST_CHARGE,
+	SMB2_FULLON_CHARGE,
+	SMB2_TAPER_CHARGE,
+	SMB2_TERMINATE_CHARGE,
+	SMB2_INHIBIT_CHARGE,
+	SMB2_DISABLE_CHARGE,
+};
+
+enum smb5_charger_status {
+	SMB5_INHIBIT_CHARGE = 0,
+	SMB5_TRICKLE_CHARGE,
+	SMB5_PRE_CHARGE,
+	SMB5_FULLON_CHARGE,
+	SMB5_TAPER_CHARGE,
+	SMB5_TERMINATE_CHARGE,
+	SMB5_PAUSE_CHARGE,
+	SMB5_DISABLE_CHARGE,
 };
 
 struct smb_init_register {
@@ -374,13 +401,21 @@ struct smb_init_register {
 	u8 val;
 };
 
+struct smb_match_data;
+
 /**
  * struct smb_chip - smb chip structure
  * @dev:		Device reference for power_supply
  * @name:		The platform device name
  * @base:		Base address for smb registers
  * @regmap:		Register map
- * @batt_info:		Battery data from DT
+ * @match_data:		Per-PMIC hardware parameters
+ * @gen:		Charger hardware generation
+ * @icl_max_ua:		Maximum programmable USB input current
+ * @icl_step_ua:	USB input current register step
+ * @icl_status:		Effective input current status register offset
+ * @usbin_current_scale: USB input current-sense scale
+ * @initial_usb_suspend:	USB input suspend state before SMB5 setup
  * @initial_charge_enable: Charging enable state before hardware setup
  * @status_change_work: Worker to handle plug/unplug events
  * @cable_irq:		USB plugin IRQ
@@ -394,7 +429,13 @@ struct smb_chip {
 	const char *name;
 	unsigned int base;
 	struct regmap *regmap;
-	struct power_supply_battery_info *batt_info;
+	const struct smb_match_data *match_data;
+	enum smb_generation gen;
+	unsigned int icl_max_ua;
+	unsigned int icl_step_ua;
+	u16 icl_status;
+	unsigned int usbin_current_scale;
+	u8 initial_usb_suspend;
 	u8 initial_charge_enable;
 
 	struct delayed_work status_change_work;
@@ -405,6 +446,22 @@ struct smb_chip {
 	struct iio_channel *usb_in_v_chan;
 
 	struct power_supply *chg_psy;
+};
+
+struct smb_match_data {
+	const char *name;
+	enum smb_generation gen;
+	size_t init_seq_len;
+	unsigned int fv_min_uv;
+	unsigned int fv_max_uv;
+	unsigned int fv_step_uv;
+	unsigned int fcc_max_ua;
+	unsigned int fcc_step_ua;
+	unsigned int icl_max_ua;
+	unsigned int icl_step_ua;
+	u16 icl_status;
+	unsigned int usbin_current_scale;
+	const struct smb_init_register *init_seq;
 };
 
 static enum power_supply_property smb_properties[] = {
@@ -424,7 +481,7 @@ static int smb_get_prop_usb_online(struct smb_chip *chip, int *val)
 	unsigned int stat;
 	int rc;
 
-	rc = regmap_read(chip->regmap, chip->base + POWER_PATH_STATUS, &stat);
+	rc = regmap_read(chip->regmap, chip->base + POWER_PATH_STATUS(chip), &stat);
 	if (rc < 0) {
 		dev_err(chip->dev, "Couldn't read power path status: %d\n", rc);
 		return rc;
@@ -479,9 +536,80 @@ static int smb_apsd_get_charger_type(struct smb_chip *chip, int *val)
 	return 0;
 }
 
+/* Return 1 when in overvoltage state, else 0 or -errno */
+static int smbx_ov_status(struct smb_chip *chip)
+{
+	u8 mask;
+	int rc;
+	u32 val;
+
+	switch (chip->gen) {
+	case SMB2:
+		mask = SMB2_CHARGER_ERROR_STATUS_BAT_OV_BIT;
+		break;
+	case SMB5:
+		mask = SMB5_CHARGER_ERROR_STATUS_BAT_OV_BIT;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	rc = regmap_read(chip->regmap,
+			 chip->base + BATTERY_CHARGER_STATUS_2, &val);
+	if (rc)
+		return rc;
+
+	return !!(val & mask);
+}
+
+static int smb_map_charge_status(struct smb_chip *chip, u32 stat, int *val)
+{
+	switch (chip->gen) {
+	case SMB2:
+		switch (stat) {
+		case SMB2_TRICKLE_CHARGE:
+		case SMB2_PRE_CHARGE:
+		case SMB2_FAST_CHARGE:
+		case SMB2_FULLON_CHARGE:
+		case SMB2_TAPER_CHARGE:
+			*val = POWER_SUPPLY_STATUS_CHARGING;
+			return 0;
+		case SMB2_TERMINATE_CHARGE:
+		case SMB2_INHIBIT_CHARGE:
+			*val = POWER_SUPPLY_STATUS_FULL;
+			return 0;
+		case SMB2_DISABLE_CHARGE:
+			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			return 0;
+		}
+		break;
+	case SMB5:
+		switch (stat) {
+		case SMB5_TRICKLE_CHARGE:
+		case SMB5_PRE_CHARGE:
+		case SMB5_FULLON_CHARGE:
+		case SMB5_TAPER_CHARGE:
+			*val = POWER_SUPPLY_STATUS_CHARGING;
+			return 0;
+		case SMB5_TERMINATE_CHARGE:
+		case SMB5_INHIBIT_CHARGE:
+			*val = POWER_SUPPLY_STATUS_FULL;
+			return 0;
+		case SMB5_PAUSE_CHARGE:
+		case SMB5_DISABLE_CHARGE:
+			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			return 0;
+		}
+		break;
+	}
+
+	*val = POWER_SUPPLY_STATUS_UNKNOWN;
+	return 0;
+}
+
 static int smb_get_prop_status(struct smb_chip *chip, int *val)
 {
-	unsigned char stat[2];
+	u32 stat;
 	int usb_online = 0;
 	int rc;
 
@@ -491,49 +619,36 @@ static int smb_get_prop_status(struct smb_chip *chip, int *val)
 		return rc;
 	}
 
-	rc = regmap_bulk_read(chip->regmap,
-			      chip->base + BATTERY_CHARGER_STATUS_1, &stat, 2);
+	rc = regmap_read(chip->regmap,
+			 chip->base + BATTERY_CHARGER_STATUS_1, &stat);
 	if (rc < 0) {
 		dev_err(chip->dev, "Failed to read charging status ret=%d\n",
 			rc);
 		return rc;
 	}
 
-	if (stat[1] & CHARGER_ERROR_STATUS_BAT_OV_BIT) {
+	rc = smbx_ov_status(chip);
+	if (rc < 0)
+		return rc;
+
+	/* In overvoltage state */
+	if (rc == 1) {
 		*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		return 0;
 	}
 
-	stat[0] = stat[0] & BATTERY_CHARGER_STATUS_MASK;
+	stat &= BATTERY_CHARGER_STATUS_MASK;
 
-	switch (stat[0]) {
-	case TRICKLE_CHARGE:
-	case PRE_CHARGE:
-	case FAST_CHARGE:
-	case FULLON_CHARGE:
-	case TAPER_CHARGE:
-		*val = POWER_SUPPLY_STATUS_CHARGING;
-		return rc;
-	case DISABLE_CHARGE:
-		*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		return rc;
-	case TERMINATE_CHARGE:
-	case INHIBIT_CHARGE:
-		*val = POWER_SUPPLY_STATUS_FULL;
-		return rc;
-	default:
-		*val = POWER_SUPPLY_STATUS_UNKNOWN;
-		return rc;
-	}
+	return smb_map_charge_status(chip, stat, val);
 }
 
 static inline int smb_get_current_limit(struct smb_chip *chip,
 					 unsigned int *val)
 {
-	int rc = regmap_read(chip->regmap, chip->base + ICL_STATUS, val);
+	int rc = regmap_read(chip->regmap, chip->base + chip->icl_status, val);
 
 	if (rc >= 0)
-		*val *= CURRENT_SCALE_FACTOR;
+		*val *= chip->icl_step_ua;
 	return rc;
 }
 
@@ -541,12 +656,13 @@ static int smb_set_current_limit(struct smb_chip *chip, unsigned int val)
 {
 	unsigned char val_raw;
 
-	if (val > 4800000) {
+	if (val > chip->icl_max_ua) {
 		dev_err(chip->dev,
-			"Can't set current limit higher than 4800000uA");
+			"Can't set current limit higher than %uuA",
+			chip->icl_max_ua);
 		return -EINVAL;
 	}
-	val_raw = val / CURRENT_SCALE_FACTOR;
+	val_raw = val / chip->icl_step_ua;
 
 	return regmap_write(chip->regmap, chip->base + USBIN_CURRENT_LIMIT_CFG,
 			    val_raw);
@@ -623,7 +739,61 @@ static int smb_get_iio_chan(struct smb_chip *chip, struct iio_channel *chan,
 	return iio_read_channel_processed(chan, val);
 }
 
-static int smb_get_prop_health(struct smb_chip *chip, int *val)
+static int smb_get_prop_current_now(struct smb_chip *chip, int *val)
+{
+	s64 current_ua;
+	int rc;
+
+	rc = smb_get_iio_chan(chip, chip->usb_in_i_chan, val);
+	if (rc < 0)
+		return rc;
+
+	current_ua = (s64)*val * chip->usbin_current_scale;
+	if (current_ua < INT_MIN || current_ua > INT_MAX)
+		return -ERANGE;
+
+	*val = (int)current_ua;
+	return 0;
+}
+
+static int smb5_get_prop_health(struct smb_chip *chip, int *val)
+{
+	int rc;
+	unsigned int stat;
+
+	rc = smbx_ov_status(chip);
+	if (rc < 0) {
+		dev_err(chip->dev,
+			"Couldn't determine overvoltage status: %d\n", rc);
+		return rc;
+	}
+	if (rc) {
+		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+		return 0;
+	}
+
+	rc = regmap_read(chip->regmap, chip->base + BATTERY_CHARGER_STATUS_7,
+			 &stat);
+	if (rc < 0) {
+		dev_err(chip->dev, "Couldn't read charger status 7 rc=%d\n", rc);
+		return rc;
+	}
+
+	if (stat & SMB5_BAT_TEMP_STATUS_TOO_COLD_BIT)
+		*val = POWER_SUPPLY_HEALTH_COLD;
+	else if (stat & SMB5_BAT_TEMP_STATUS_TOO_HOT_BIT)
+		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
+	else if (stat & SMB5_BAT_TEMP_STATUS_COLD_SOFT_BIT)
+		*val = POWER_SUPPLY_HEALTH_COOL;
+	else if (stat & SMB5_BAT_TEMP_STATUS_HOT_SOFT_BIT)
+		*val = POWER_SUPPLY_HEALTH_WARM;
+	else
+		*val = POWER_SUPPLY_HEALTH_GOOD;
+
+	return 0;
+}
+
+static int smb2_get_prop_health(struct smb_chip *chip, int *val)
 {
 	int rc;
 	unsigned int stat;
@@ -635,20 +805,33 @@ static int smb_get_prop_health(struct smb_chip *chip, int *val)
 		return rc;
 	}
 
-	if (stat & CHARGER_ERROR_STATUS_BAT_OV_BIT)
+	if (stat & SMB2_CHARGER_ERROR_STATUS_BAT_OV_BIT)
 		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
-	else if (stat & BAT_TEMP_STATUS_TOO_COLD_BIT)
+	else if (stat & SMB2_BAT_TEMP_STATUS_TOO_COLD_BIT)
 		*val = POWER_SUPPLY_HEALTH_COLD;
-	else if (stat & BAT_TEMP_STATUS_TOO_HOT_BIT)
+	else if (stat & SMB2_BAT_TEMP_STATUS_TOO_HOT_BIT)
 		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
-	else if (stat & BAT_TEMP_STATUS_COLD_SOFT_LIMIT_BIT)
+	else if (stat & SMB2_BAT_TEMP_STATUS_COLD_SOFT_LIMIT_BIT)
 		*val = POWER_SUPPLY_HEALTH_COOL;
-	else if (stat & BAT_TEMP_STATUS_HOT_SOFT_LIMIT_BIT)
+	else if (stat & SMB2_BAT_TEMP_STATUS_HOT_SOFT_LIMIT_BIT)
 		*val = POWER_SUPPLY_HEALTH_WARM;
 	else
 		*val = POWER_SUPPLY_HEALTH_GOOD;
 
 	return 0;
+}
+
+static int smb_get_prop_health(struct smb_chip *chip, int *val)
+{
+	switch (chip->gen) {
+	case SMB2:
+		return smb2_get_prop_health(chip, val);
+	case SMB5:
+		return smb5_get_prop_health(chip, val);
+	default:
+		dev_err(chip->dev, "unsupported SMB chip generation\n");
+		return -EINVAL;
+	}
 }
 
 static int smb_get_property(struct power_supply *psy,
@@ -667,8 +850,7 @@ static int smb_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		return smb_get_current_limit(chip, &val->intval);
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-		return smb_get_iio_chan(chip, chip->usb_in_i_chan,
-					 &val->intval);
+		return smb_get_prop_current_now(chip, &val->intval);
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		return smb_get_iio_chan(chip, chip->usb_in_v_chan,
 					 &val->intval);
@@ -719,17 +901,15 @@ static int smb_property_is_writable(struct power_supply *psy,
 static irqreturn_t smb_handle_batt_overvoltage(int irq, void *data)
 {
 	struct smb_chip *chip = data;
-	unsigned int status;
 	int rc;
 
-	rc = regmap_read(chip->regmap,
-			 chip->base + BATTERY_CHARGER_STATUS_2, &status);
+	rc = smbx_ov_status(chip);
 	if (rc < 0) {
-		dev_err(chip->dev, "Couldn't read charger status: %d\n", rc);
+		dev_err(chip->dev, "could not read overvoltage status: %d\n", rc);
 		return IRQ_HANDLED;
 	}
 
-	if (status & CHARGER_ERROR_STATUS_BAT_OV_BIT) {
+	if (rc) {
 		/* The hardware stops charging automatically */
 		dev_err(chip->dev, "battery overvoltage detected\n");
 	}
@@ -784,6 +964,144 @@ static irqreturn_t smb_handle_wdog_bark(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static bool smb_batt_info_has_prop(struct power_supply_battery_info *batt_info,
+				   enum power_supply_property prop)
+{
+	return power_supply_battery_info_has_prop(batt_info, prop);
+}
+
+static int smb_power_supply_init(struct power_supply *psy)
+{
+	struct smb_chip *chip = power_supply_get_drvdata(psy);
+	const struct smb_match_data *match_data = chip->match_data;
+	struct power_supply_battery_info *batt_info;
+	unsigned int fast_charge_current_sel;
+	unsigned int float_voltage_sel;
+	bool program_float_voltage = true;
+	int fast_charge_current_ua;
+	int float_voltage_uv;
+	int rc;
+
+	rc = power_supply_get_battery_info(psy, &batt_info);
+	if (rc)
+		return dev_err_probe(chip->dev, rc,
+				     "Failed to get battery info\n");
+
+	if (smb_batt_info_has_prop(batt_info,
+				   POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX)) {
+		float_voltage_uv = batt_info->constant_charge_voltage_max_uv;
+	} else if (smb_batt_info_has_prop(batt_info,
+					  POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN)) {
+		float_voltage_uv = batt_info->voltage_max_design_uv;
+	} else {
+		dev_warn(chip->dev,
+			 "No battery float voltage; preserving hardware setting\n");
+		program_float_voltage = false;
+	}
+
+	if (program_float_voltage) {
+		if (float_voltage_uv < match_data->fv_min_uv ||
+		    float_voltage_uv > match_data->fv_max_uv) {
+			rc = dev_err_probe(chip->dev, -EINVAL,
+					   "float voltage %d uV outside %u-%u uV\n",
+					   float_voltage_uv,
+					   match_data->fv_min_uv,
+					   match_data->fv_max_uv);
+			goto out_put_batt_info;
+		}
+
+		float_voltage_sel =
+			(float_voltage_uv - match_data->fv_min_uv) /
+			match_data->fv_step_uv;
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + FLOAT_VOLTAGE_CFG,
+					FLOAT_VOLTAGE_SETTING_MASK,
+					float_voltage_sel);
+		if (rc < 0) {
+			rc = dev_err_probe(chip->dev, rc,
+					   "could not set float voltage\n");
+			goto out_put_batt_info;
+		}
+	}
+
+	if (chip->gen == SMB5) {
+		if (smb_batt_info_has_prop(batt_info,
+					   POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX))
+			fast_charge_current_ua =
+				batt_info->constant_charge_current_max_ua;
+		else
+			fast_charge_current_ua = DCP_CURRENT_UA;
+
+		if (fast_charge_current_ua > match_data->fcc_max_ua) {
+			rc = dev_err_probe(chip->dev, -EINVAL,
+					   "fast charge current %d uA exceeds %u uA\n",
+					   fast_charge_current_ua,
+					   match_data->fcc_max_ua);
+			goto out_put_batt_info;
+		}
+
+		fast_charge_current_sel = fast_charge_current_ua /
+			match_data->fcc_step_ua;
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + FAST_CHARGE_CURRENT_CFG,
+					FAST_CHARGE_CURRENT_SETTING_MASK,
+					fast_charge_current_sel);
+		if (rc < 0) {
+			rc = dev_err_probe(chip->dev, rc,
+					   "could not set fast charge current\n");
+			goto out_put_batt_info;
+		}
+
+		rc = smb_set_current_limit(chip, SDP_CURRENT_UA);
+		if (rc < 0) {
+			rc = dev_err_probe(chip->dev, rc,
+					   "could not set USB input current\n");
+			goto out_put_batt_info;
+		}
+
+		if (program_float_voltage)
+			dev_info(chip->dev,
+				 "charge limits: float=%u uV fast=%u uA input=%u uA\n",
+				 match_data->fv_min_uv +
+				 float_voltage_sel * match_data->fv_step_uv,
+				 fast_charge_current_sel * match_data->fcc_step_ua,
+				 SDP_CURRENT_UA);
+		else
+			dev_info(chip->dev,
+				 "charge limits: float=firmware fast=%u uA input=%u uA\n",
+				 fast_charge_current_sel * match_data->fcc_step_ua,
+				 SDP_CURRENT_UA);
+	}
+
+	rc = 0;
+
+out_put_batt_info:
+	power_supply_put_battery_info(psy, batt_info);
+
+	if (rc)
+		return rc;
+
+	if (chip->gen != SMB5)
+		return 0;
+
+	rc = regmap_update_bits(chip->regmap,
+				chip->base + CHARGING_ENABLE_CMD,
+				CHARGING_ENABLE_CMD_BIT,
+				CHARGING_ENABLE_CMD_BIT);
+	if (rc < 0)
+		return dev_err_probe(chip->dev, rc,
+				     "could not enable charging\n");
+
+	rc = regmap_update_bits(chip->regmap,
+				chip->base + USBIN_CMD_IL,
+				USBIN_SUSPEND_BIT, 0);
+	if (rc < 0)
+		return dev_err_probe(chip->dev, rc,
+				     "could not enable USB input\n");
+
+	return 0;
+}
+
 static const struct power_supply_desc smb_psy_desc = {
 	.name = "pmi8998_charger",
 	.type = POWER_SUPPLY_TYPE_USB,
@@ -796,36 +1114,85 @@ static const struct power_supply_desc smb_psy_desc = {
 	.get_property = smb_get_property,
 	.set_property = smb_set_property,
 	.property_is_writeable = smb_property_is_writable,
+	.init = smb_power_supply_init,
 };
 
 /* Init sequence derived from vendor downstream driver */
-static const struct smb_init_register smb_init_seq[] = {
-	{ .addr = AICL_RERUN_TIME_CFG, .mask = AICL_RERUN_TIME_MASK, .val = 0 },
+static const struct smb_init_register smb5_init_seq[] = {
+	/*
+	 * TCPM owns the separate Type-C peripheral. This register only
+	 * controls how the charger's USBIN peripheral starts BC1.2 detection.
+	 */
+	{ .addr = USBIN_TYPE_C_CFG,
+	  .mask = APSD_START_ON_CC_BIT,
+	  .val = 0 },
+	/* Enable BC1.2 source detection without unsupported HVDCP negotiation. */
+	{ .addr = USBIN_OPTIONS_1_CFG,
+	  .mask = HVDCP_AUTH_ALG_EN_CFG_BIT |
+		  HVDCP_AUTONOMOUS_MODE_EN_CFG_BIT | AUTO_SRC_DETECT_BIT |
+		  HVDCP_EN_BIT,
+	  .val = AUTO_SRC_DETECT_BIT },
+	/* Set the default SDP charger type to a 500ma USB 2.0 port */
+	{ .addr = USBIN_ICL_OPTIONS,
+	  .mask = USBIN_MODE_CHG_BIT,
+	  .val = USBIN_MODE_CHG_BIT },
+	{ .addr = CMD_ICL_OVERRIDE,
+	  .mask = ICL_OVERRIDE_BIT,
+	  .val = 0 },
+	{ .addr = USBIN_LOAD_CFG,
+	  .mask = ICL_OVERRIDE_AFTER_APSD_BIT,
+	  .val = 0 },
+	/* Disable watchdog */
+	{ .addr = SNARL_BARK_BITE_WD_CFG, .mask = 0xff, .val = 0 },
+	{ .addr = WD_CFG,
+	  .mask = WATCHDOG_TRIGGER_AFP_EN_BIT | WDOG_TIMER_EN_ON_PLUGIN_BIT |
+		  BARK_WDOG_INT_EN_BIT,
+	  .val = 0 },
+	/*
+	 * Enable Automatic Input Current Limit, this will slowly ramp up the current
+	 * When connected to a wall charger, and automatically stop when it detects
+	 * the charger current limit (voltage drop?) or it reaches the programmed limit.
+	 */
+	{ .addr = USBIN_AICL_OPTIONS_CFG,
+	  .mask = USBIN_AICL_PERIODIC_RERUN_EN_BIT | USBIN_AICL_ADC_EN_BIT
+			| USBIN_AICL_EN_BIT | SUSPEND_ON_COLLAPSE_USBIN_BIT,
+	  .val = USBIN_AICL_PERIODIC_RERUN_EN_BIT | USBIN_AICL_EN_BIT |
+		 SUSPEND_ON_COLLAPSE_USBIN_BIT },
+	{ .addr = AICL_RERUN_TIME_CFG,
+	  .mask = AICL_RERUN_TIME_MASK,
+	  .val = AICL_RERUN_TIME_12_SECS },
+};
+
+/* Init sequence derived from vendor downstream driver */
+static const struct smb_init_register smb2_init_seq[] = {
+	{ .addr = AICL_RERUN_TIME_CFG,
+	  .mask = AICL_RERUN_TIME_MASK,
+	  .val = AICL_RERUN_TIME_3_SECS },
 	/*
 	 * By default configure us as an upstream facing port
 	 * FIXME: This will be handled by the type-c driver
 	 */
 	{ .addr = TYPE_C_INTRPT_ENB_SOFTWARE_CTRL,
-	  .mask = TYPEC_POWER_ROLE_CMD_MASK | VCONN_EN_SRC_BIT |
+	  .mask = TYPEC_POWER_ROLE_CMD_MASK | SMB2_VCONN_EN_SRC_BIT |
 		  VCONN_EN_VALUE_BIT,
-	  .val = VCONN_EN_SRC_BIT },
+	  .val = SMB2_VCONN_EN_SRC_BIT },
 	/*
 	 * Disable Type-C factory mode and stay in Attached.SRC state when VCONN
 	 * over-current happens
 	 */
-	{ .addr = TYPE_C_CFG,
+	{ .addr = USBIN_TYPE_C_CFG,
 	  .mask = FACTORY_MODE_DETECTION_EN_BIT | VCONN_OC_CFG_BIT,
 	  .val = 0 },
 	/* Configure VBUS for software control */
-	{ .addr = OTG_CFG, .mask = OTG_EN_SRC_CFG_BIT, .val = 0 },
+	{ .addr = SMB2_OTG_CFG, .mask = SMB2_OTG_EN_SRC_CFG_BIT, .val = 0 },
 	/*
 	 * Use VBAT to determine the recharge threshold when battery is full
 	 * rather than the state of charge.
 	 */
-	{ .addr = FG_UPDATE_CFG_2_SEL,
-	  .mask = SOC_LT_CHG_RECHARGE_THRESH_SEL_BIT |
-		  VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT,
-	  .val = VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT },
+	{ .addr = SMB2_FG_UPDATE_CFG_2_SEL,
+	  .mask = SMB2_SOC_LT_CHG_RECHARGE_THRESH_SEL_BIT |
+		  SMB2_VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT,
+	  .val = SMB2_VBT_LT_CHG_RECHARGE_THRESH_SEL_BIT },
 	{ .addr = USBIN_OPTIONS_1_CFG, .mask = HVDCP_EN_BIT, .val = 0 },
 	/*
 	 * Match downstream defaults
@@ -893,7 +1260,7 @@ static const struct smb_init_register smb_init_seq[] = {
 	 */
 	{ .addr = PRE_CHARGE_CURRENT_CFG,
 	  .mask = PRE_CHARGE_CURRENT_SETTING_MASK,
-	  .val = 500000 / CURRENT_SCALE_FACTOR },
+	  .val = 500000 / SMB2_CURRENT_STEP_UA },
 	/*
 	 * This overrides all of the current limit options exposed to userspace
 	 * and prevents the device from pulling more than ~1A. This is done
@@ -901,20 +1268,69 @@ static const struct smb_init_register smb_init_seq[] = {
 	 */
 	{ .addr = FAST_CHARGE_CURRENT_CFG,
 	  .mask = FAST_CHARGE_CURRENT_SETTING_MASK,
-	  .val = 1000000 / CURRENT_SCALE_FACTOR },
+	  .val = 1000000 / SMB2_CURRENT_STEP_UA },
 };
 
-static int smb_init_hw(struct smb_chip *chip)
+static const struct smb_match_data pmi8998_match_data = {
+	.init_seq = smb2_init_seq,
+	.init_seq_len = ARRAY_SIZE(smb2_init_seq),
+	.name = "pmi8998",
+	.gen = SMB2,
+	.fv_min_uv = 3487500,
+	.fv_max_uv = 4920000,
+	.fv_step_uv = 7500,
+	.fcc_max_ua = 4500000,
+	.fcc_step_ua = 25000,
+	.icl_max_ua = 4800000,
+	.icl_step_ua = 25000,
+	.icl_status = SMB2_ICL_STATUS,
+	.usbin_current_scale = 1,
+};
+
+static const struct smb_match_data pm660_match_data = {
+	.init_seq = smb2_init_seq,
+	.init_seq_len = ARRAY_SIZE(smb2_init_seq),
+	.name = "pm660",
+	.gen = SMB2,
+	.fv_min_uv = 3487500,
+	.fv_max_uv = 4920000,
+	.fv_step_uv = 7500,
+	.fcc_max_ua = 4500000,
+	.fcc_step_ua = 25000,
+	.icl_max_ua = 4800000,
+	.icl_step_ua = 25000,
+	.icl_status = SMB2_ICL_STATUS,
+	.usbin_current_scale = 1,
+};
+
+static const struct smb_match_data pm8150b_match_data = {
+	.init_seq = smb5_init_seq,
+	.init_seq_len = ARRAY_SIZE(smb5_init_seq),
+	.name = "pm8150b",
+	.gen = SMB5,
+	.fv_min_uv = 3600000,
+	.fv_max_uv = 4790000,
+	.fv_step_uv = 10000,
+	.fcc_max_ua = 8000000,
+	.fcc_step_ua = 50000,
+	.icl_max_ua = 5000000,
+	.icl_step_ua = 50000,
+	.icl_status = SMB5_AICL_ICL_STATUS,
+	.usbin_current_scale = 5,
+};
+
+static int smb_init_hw(struct smb_chip *chip,
+		       const struct smb_init_register *init_seq, size_t len)
 {
 	int rc, i;
 
-	for (i = 0; i < ARRAY_SIZE(smb_init_seq); i++) {
+	for (i = 0; i < len; i++) {
 		dev_dbg(chip->dev, "%d: Writing 0x%02x to 0x%02x\n", i,
-			smb_init_seq[i].val, smb_init_seq[i].addr);
+			init_seq[i].val, init_seq[i].addr);
 		rc = regmap_update_bits(chip->regmap,
-					chip->base + smb_init_seq[i].addr,
-					smb_init_seq[i].mask,
-					smb_init_seq[i].val);
+					chip->base + init_seq[i].addr,
+					init_seq[i].mask,
+					init_seq[i].val);
 		if (rc < 0)
 			return dev_err_probe(chip->dev, rc,
 					     "%s: init command %d failed\n",
@@ -922,19 +1338,6 @@ static int smb_init_hw(struct smb_chip *chip)
 	}
 
 	return 0;
-}
-
-static void smb_restore_charge_enable(void *data)
-{
-	struct smb_chip *chip = data;
-	int rc;
-
-	rc = regmap_update_bits(chip->regmap,
-				chip->base + CHARGING_ENABLE_CMD,
-				CHARGING_ENABLE_CMD_BIT,
-				chip->initial_charge_enable);
-	if (rc < 0)
-		dev_err(chip->dev, "Couldn't restore charging state: %d\n", rc);
 }
 
 static int smb_init_irq(struct smb_chip *chip, int *irq, const char *name,
@@ -958,14 +1361,38 @@ static int smb_init_irq(struct smb_chip *chip, int *irq, const char *name,
 	return 0;
 }
 
+static void smb_restore_charge_state(void *data)
+{
+	struct smb_chip *chip = data;
+	int rc;
+
+	rc = regmap_update_bits(chip->regmap,
+				chip->base + CHARGING_ENABLE_CMD,
+				CHARGING_ENABLE_CMD_BIT,
+				chip->initial_charge_enable);
+	if (rc < 0) {
+		dev_err(chip->dev, "could not restore charging state: %d\n", rc);
+		return;
+	}
+
+	if (chip->gen == SMB5) {
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + USBIN_CMD_IL,
+					USBIN_SUSPEND_BIT,
+					chip->initial_usb_suspend);
+		if (rc < 0)
+			dev_err(chip->dev,
+				"could not restore USB input state: %d\n", rc);
+	}
+}
+
 static int smb_probe(struct platform_device *pdev)
 {
 	struct power_supply_config supply_config = {};
 	struct power_supply_desc *desc;
 	struct smb_chip *chip;
-	unsigned int charge_enable;
-	unsigned int float_voltage_sel;
-	int float_voltage_uv;
+	const struct smb_match_data *match_data;
+	unsigned int reg;
 	int rc, irq;
 
 	chip = devm_kzalloc_obj(&pdev->dev, *chip);
@@ -996,19 +1423,57 @@ static int smb_probe(struct platform_device *pdev)
 				     "Couldn't get usbin_i IIO channel\n");
 	}
 
-	rc = regmap_read(chip->regmap, chip->base + CHARGING_ENABLE_CMD,
-			 &charge_enable);
+	match_data = device_get_match_data(chip->dev);
+	if (!match_data)
+		return dev_err_probe(chip->dev, -ENODEV,
+				     "missing match data\n");
+
+	chip->gen = match_data->gen;
+	chip->match_data = match_data;
+	chip->icl_max_ua = match_data->icl_max_ua;
+	chip->icl_step_ua = match_data->icl_step_ua;
+	chip->icl_status = match_data->icl_status;
+	chip->usbin_current_scale = match_data->usbin_current_scale;
+
+	dev_info(chip->dev, "Generation %s\n", chip->gen == SMB2 ? "SMB2" : "SMB5");
+	if (chip->gen == SMB5) {
+		rc = regmap_read(chip->regmap, chip->base + USBIN_CMD_IL, &reg);
+		if (rc < 0)
+			return dev_err_probe(chip->dev, rc,
+					     "could not read USB input state\n");
+		chip->initial_usb_suspend = reg & USBIN_SUSPEND_BIT;
+	}
+
+	rc = regmap_read(chip->regmap,
+			 chip->base + CHARGING_ENABLE_CMD, &reg);
 	if (rc < 0)
 		return dev_err_probe(chip->dev, rc,
-				     "Couldn't read charging state\n");
+				     "could not read charging state\n");
+	chip->initial_charge_enable = reg & CHARGING_ENABLE_CMD_BIT;
 
-	chip->initial_charge_enable = charge_enable & CHARGING_ENABLE_CMD_BIT;
-	rc = devm_add_action_or_reset(chip->dev, smb_restore_charge_enable, chip);
-	if (rc)
-		return dev_err_probe(chip->dev, rc,
-				     "Couldn't register charging state rollback\n");
+	rc = devm_add_action_or_reset(chip->dev,
+				      smb_restore_charge_state, chip);
+	if (rc < 0)
+		return rc;
 
-	rc = smb_init_hw(chip);
+	if (chip->gen == SMB5) {
+		/* Do not use bootloader charge limits while configuring SMB5. */
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + USBIN_CMD_IL,
+					USBIN_SUSPEND_BIT, USBIN_SUSPEND_BIT);
+		if (rc < 0)
+			return dev_err_probe(chip->dev, rc,
+					     "could not suspend USB input\n");
+
+		rc = regmap_update_bits(chip->regmap,
+					chip->base + CHARGING_ENABLE_CMD,
+					CHARGING_ENABLE_CMD_BIT, 0);
+		if (rc < 0)
+			return dev_err_probe(chip->dev, rc,
+					     "could not disable charging\n");
+	}
+
+	rc = smb_init_hw(chip, match_data->init_seq, match_data->init_seq_len);
 	if (rc < 0)
 		return rc;
 
@@ -1021,7 +1486,7 @@ static int smb_probe(struct platform_device *pdev)
 	memcpy(desc, &smb_psy_desc, sizeof(smb_psy_desc));
 	desc->name =
 		devm_kasprintf(chip->dev, GFP_KERNEL, "%s-charger",
-			       (const char *)device_get_match_data(chip->dev));
+			       match_data->name);
 	if (!desc->name)
 		return -ENOMEM;
 
@@ -1031,46 +1496,13 @@ static int smb_probe(struct platform_device *pdev)
 		return dev_err_probe(chip->dev, PTR_ERR(chip->chg_psy),
 				     "failed to register power supply\n");
 
-	rc = power_supply_get_battery_info(chip->chg_psy, &chip->batt_info);
-	if (rc)
-		return dev_err_probe(chip->dev, rc,
-				     "Failed to get battery info\n");
-
-	rc = devm_delayed_work_autocancel(chip->dev, &chip->status_change_work,
+	rc = devm_delayed_work_autocancel(chip->dev,
+					  &chip->status_change_work,
 					  smb_status_change_work);
 	if (rc)
 		return dev_err_probe(chip->dev, rc,
 				     "Failed to init status change work\n");
 
-	if (power_supply_battery_info_has_prop(chip->batt_info,
-					       POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX)) {
-		float_voltage_uv =
-			chip->batt_info->constant_charge_voltage_max_uv;
-	} else if (power_supply_battery_info_has_prop(chip->batt_info,
-					      POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN)) {
-		float_voltage_uv = chip->batt_info->voltage_max_design_uv;
-	} else {
-		dev_warn(chip->dev, "No battery float voltage; preserving hardware setting\n");
-		goto skip_float_voltage;
-	}
-
-	if (float_voltage_uv < SMB2_FLOAT_VOLTAGE_MIN_UV ||
-	    float_voltage_uv > SMB2_FLOAT_VOLTAGE_MAX_UV)
-		return dev_err_probe(chip->dev, -EINVAL,
-				     "float voltage %d uV outside %d-%d uV\n",
-				     float_voltage_uv,
-				     SMB2_FLOAT_VOLTAGE_MIN_UV,
-				     SMB2_FLOAT_VOLTAGE_MAX_UV);
-
-	float_voltage_sel =
-		(float_voltage_uv - SMB2_FLOAT_VOLTAGE_MIN_UV) /
-		SMB2_FLOAT_VOLTAGE_STEP_UV;
-	rc = regmap_update_bits(chip->regmap, chip->base + FLOAT_VOLTAGE_CFG,
-				FLOAT_VOLTAGE_SETTING_MASK, float_voltage_sel);
-	if (rc < 0)
-		return dev_err_probe(chip->dev, rc, "Couldn't set vbat max\n");
-
-skip_float_voltage:
 	rc = smb_init_irq(chip, &irq, "bat-ov", smb_handle_batt_overvoltage);
 	if (rc < 0)
 		return rc;
@@ -1109,7 +1541,7 @@ skip_float_voltage:
 	if (rc < 0)
 		return dev_err_probe(chip->dev, rc, "Couldn't set wake irq\n");
 
-	devm_remove_action(chip->dev, smb_restore_charge_enable, chip);
+	devm_remove_action(chip->dev, smb_restore_charge_state, chip);
 
 	platform_set_drvdata(pdev, chip);
 
@@ -1120,8 +1552,9 @@ skip_float_voltage:
 }
 
 static const struct of_device_id smb_match_id_table[] = {
-	{ .compatible = "qcom,pmi8998-charger", .data = "pmi8998" },
-	{ .compatible = "qcom,pm660-charger", .data = "pm660" },
+	{ .compatible = "qcom,pmi8998-charger", .data = &pmi8998_match_data },
+	{ .compatible = "qcom,pm660-charger", .data = &pm660_match_data },
+	{ .compatible = "qcom,pm8150b-charger", .data = &pm8150b_match_data },
 	{ /* sentinal */ }
 };
 MODULE_DEVICE_TABLE(of, smb_match_id_table);
@@ -1137,6 +1570,6 @@ static struct platform_driver qcom_spmi_smb = {
 module_platform_driver(qcom_spmi_smb);
 
 MODULE_AUTHOR("Casey Connolly <casey.connolly@linaro.org>");
-MODULE_DESCRIPTION("Qualcomm SMB2 Charger Driver");
+MODULE_DESCRIPTION("Qualcomm SMB2 and SMB5 Charger Driver");
 MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS("IIO_CONSUMER");
