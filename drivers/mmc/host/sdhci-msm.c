@@ -2949,7 +2949,27 @@ static int sdhci_msm_runtime_suspend(struct device *dev)
 
 	spin_lock_irqsave(&host->lock, flags);
 	host->runtime_suspended = true;
+	/*
+	 * The SDCC apps clock is a shared RCG that gets parked on an
+	 * always-on safe source (bi_tcxo) at clk_disable() time instead of
+	 * being gated, so the controller stays powered and clocked while
+	 * the host is runtime suspended and keeps signalling status events
+	 * (measured on Odin 2/SM8550: bursts of 15-50 irq/s on CPU0 with
+	 * zero mmc errors whenever the host is suspended, keeping CPU0 out
+	 * of deep idle and RPMh out of AOSD/CXSD - armada#274).
+	 *
+	 * sdhci_irq() bails out early with IRQ_NONE once runtime_suspended
+	 * is set, so nothing acks or masks the source while the line keeps
+	 * asserting. Mask the interrupt enables here, keeping only
+	 * SDHCI_INT_CARD_INT (SDIO wake) in case it was claimed, and
+	 * restore them from host->ier on runtime resume. Hotplug keeps
+	 * working through the external cd-gpio.
+	 */
+	sdhci_writel(host, host->ier & SDHCI_INT_CARD_INT, SDHCI_SIGNAL_ENABLE);
+	sdhci_writel(host, host->ier & SDHCI_INT_CARD_INT, SDHCI_INT_ENABLE);
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	synchronize_hardirq(host->irq);
 
 	/* Drop the performance vote */
 	dev_pm_opp_set_rate(dev, 0);
@@ -2988,6 +3008,8 @@ static int sdhci_msm_runtime_resume(struct device *dev)
 		return ret;
 
 	spin_lock_irqsave(&host->lock, flags);
+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
 	host->runtime_suspended = false;
 	spin_unlock_irqrestore(&host->lock, flags);
 
