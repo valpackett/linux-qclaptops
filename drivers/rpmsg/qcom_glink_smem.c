@@ -311,15 +311,6 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 		goto err_put_dev;
 	}
 
-	smem->irq = of_irq_get(smem->dev.of_node, 0);
-	ret = devm_request_irq(&smem->dev, smem->irq, qcom_glink_smem_intr,
-			       IRQF_NO_SUSPEND | IRQF_NO_AUTOEN,
-			       "glink-smem", smem);
-	if (ret) {
-		dev_err(&smem->dev, "failed to request IRQ\n");
-		goto err_put_dev;
-	}
-
 	smem->mbox_client.dev = &smem->dev;
 	smem->mbox_client.knows_txdone = true;
 	smem->mbox_chan = mbox_request_channel(&smem->mbox_client, 0);
@@ -353,9 +344,25 @@ struct qcom_glink_smem *qcom_glink_smem_register(struct device *parent,
 
 	smem->glink = glink;
 
-	enable_irq(smem->irq);
+	smem->irq = of_irq_get(smem->dev.of_node, 0);
+	ret = devm_request_irq(&smem->dev, smem->irq, qcom_glink_smem_intr,
+			       IRQF_NO_SUSPEND, "glink-smem", smem);
+	if (ret) {
+		dev_err(&smem->dev, "failed to request IRQ\n");
+		goto err_glink_remove;
+	}
+
+	ret = qcom_glink_native_start(glink);
+	if (ret)
+		goto err_disable_irq;
 
 	return smem;
+
+err_disable_irq:
+	disable_irq(smem->irq);
+
+err_glink_remove:
+	qcom_glink_native_remove(glink);
 
 err_free_mbox:
 	mbox_free_channel(smem->mbox_chan);
