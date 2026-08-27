@@ -319,6 +319,8 @@ int virtgpu_dma_buf_obj_resubmit(struct virtio_gpu_device *vgdev,
 
 static const struct drm_gem_object_funcs virtgpu_gem_dma_buf_funcs = {
 	.free = virtgpu_dma_buf_free_obj,
+	.open = virtio_gpu_gem_object_open,
+	.close = virtio_gpu_gem_object_close,
 };
 
 static void virtgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
