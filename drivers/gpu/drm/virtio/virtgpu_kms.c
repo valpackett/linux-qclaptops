@@ -252,6 +252,9 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_CREATE_GUEST_HANDLE))
 		vgdev->has_create_guest_handle = true;
 
+	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_BLOB_CTX_ID_FIX))
+		vgdev->has_blob_ctx_id_fix = true;
+
 	DRM_INFO("features: %cvirgl %cedid %cresource_blob %chost_visible",
 		 vgdev->has_virgl_3d    ? '+' : '-',
 		 vgdev->has_edid        ? '+' : '-',
@@ -262,8 +265,9 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 		 vgdev->has_context_init ? '+' : '-',
 		 vgdev->has_blob_alignment ? '+' : '-');
 
-	DRM_INFO("features: %ccreate_guest_handle\n",
-		 vgdev->has_create_guest_handle ? '+' : '-');
+	DRM_INFO("features: %ccreate_guest_handle %cblob_ctx_id_fix\n",
+		 vgdev->has_create_guest_handle ? '+' : '-',
+		 vgdev->has_blob_ctx_id_fix ? '+' : '-');
 
 	ret = virtio_gpu_find_vqs(vgdev);
 	if (ret) {

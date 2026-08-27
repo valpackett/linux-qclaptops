@@ -488,15 +488,17 @@ static int verify_blob(struct virtio_gpu_device *vgdev,
 		/* Must be dword aligned. */
 		if (rc_blob->cmd_size % 4 != 0)
 			return -EINVAL;
-
-		params->ctx_id = vfpriv->ctx_id;
-		params->blob_id = rc_blob->blob_id;
 	} else {
 		if (rc_blob->blob_id != 0)
 			return -EINVAL;
 
 		if (rc_blob->cmd_size != 0)
 			return -EINVAL;
+	}
+
+	if (*host3d_blob || vgdev->has_blob_ctx_id_fix) {
+		params->ctx_id = vfpriv->ctx_id;
+		params->blob_id = rc_blob->blob_id;
 	}
 
 	params->blob_mem = rc_blob->blob_mem;

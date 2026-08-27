@@ -77,6 +77,11 @@
  * VIRTIO_GPU_BLOB_FLAG_CREATE_GUEST_HANDLE
  */
 #define VIRTIO_GPU_F_CREATE_GUEST_HANDLE 6
+/*
+ * It is always safe to pass the current context ID to
+ * VIRTIO_GPU_CMD_RESOURCE_CREATE_BLOB, including for guest blobs
+ */
+#define VIRTIO_GPU_F_BLOB_CTX_ID_FIX 7
 
 enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_UNDEFINED = 0,
