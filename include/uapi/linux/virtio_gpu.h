@@ -72,6 +72,11 @@
  * must be aligned to that value.
  */
 #define VIRTIO_GPU_F_BLOB_ALIGNMENT      5
+/*
+ * It is always safe to pass the current context ID to
+ * VIRTIO_GPU_CMD_RESOURCE_CREATE_BLOB, including for guest blobs
+ */
+#define VIRTIO_GPU_F_BLOB_CTX_ID_FIX     6
 
 enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_UNDEFINED = 0,

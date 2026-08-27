@@ -249,6 +249,9 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 		vgdev->blob_alignment = blob_alignment;
 	}
 
+	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_BLOB_CTX_ID_FIX))
+		vgdev->has_blob_ctx_id_fix = true;
+
 	DRM_INFO("features: %cvirgl %cedid %cresource_blob %chost_visible",
 		 vgdev->has_virgl_3d    ? '+' : '-',
 		 vgdev->has_edid        ? '+' : '-',
@@ -258,6 +261,9 @@ int virtio_gpu_init(struct virtio_device *vdev, struct drm_device *dev)
 	DRM_INFO("features: %ccontext_init %cblob_alignment\n",
 		 vgdev->has_context_init ? '+' : '-',
 		 vgdev->has_blob_alignment ? '+' : '-');
+
+	DRM_INFO("features: %cblob_ctx_id_fix\n",
+		 vgdev->has_blob_ctx_id_fix ? '+' : '-');
 
 	ret = virtio_gpu_find_vqs(vgdev);
 	if (ret) {
