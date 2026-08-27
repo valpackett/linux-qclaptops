@@ -255,6 +255,10 @@ static int virtgpu_dma_buf_init_obj(struct drm_device *dev,
 	params.blob = true;
 	params.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
 	params.blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
+	if (vgdev->has_create_guest_handle)
+		/* No way for userspace to decide with this API, but most existing
+		 * use cases do require shareable handles on the host side */
+		params.blob_flags |= VIRTGPU_BLOB_FLAG_CREATE_GUEST_HANDLE;
 	params.size = attach->dmabuf->size;
 
 	virtio_gpu_cmd_resource_create_blob(vgdev, bo, &params,
