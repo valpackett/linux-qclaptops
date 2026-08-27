@@ -123,6 +123,9 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 			return -ENOENT;
 		value = vgdev->blob_alignment;
 		break;
+	case VIRTGPU_PARAM_CREATE_GUEST_HANDLE:
+		value = vgdev->has_create_guest_handle ? 1 : 0;
+		break;
 	default:
 		return -EINVAL;
 	}
