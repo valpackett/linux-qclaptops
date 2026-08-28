@@ -232,6 +232,7 @@ static int virtgpu_dma_buf_init_obj(struct drm_device *dev,
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct virtio_gpu_object_params params = { 0 };
 	struct dma_resv *resv = attach->dmabuf->resv;
+	struct virtio_gpu_fpriv *vfpriv = vgdev->prime_import_file_priv->driver_priv;
 	struct virtio_gpu_mem_entry *ents = NULL;
 	unsigned int nents;
 	int ret;
@@ -252,6 +253,7 @@ static int virtgpu_dma_buf_init_obj(struct drm_device *dev,
 	if (ret)
 		goto err_import;
 
+	params.ctx_id = vfpriv->ctx_id;
 	params.blob = true;
 	params.blob_mem = VIRTGPU_BLOB_MEM_GUEST;
 	params.blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
@@ -335,6 +337,16 @@ static const struct dma_buf_attach_ops virtgpu_dma_buf_attach_ops = {
 	.allow_peer2peer = true,
 	.invalidate_mappings = virtgpu_dma_buf_move_notify
 };
+
+int virtgpu_prime_fd_to_handle(struct drm_device *dev,
+			   struct drm_file *file_priv,
+			   int fd, u32 *handle)
+{
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	guard(mutex)(&vgdev->prime_import_lock);
+	vgdev->prime_import_file_priv = file_priv;
+	return drm_gem_prime_fd_to_handle(dev, file_priv, fd, handle);
+}
 
 struct drm_gem_object *virtgpu_gem_prime_import(struct drm_device *dev,
 						struct dma_buf *buf)

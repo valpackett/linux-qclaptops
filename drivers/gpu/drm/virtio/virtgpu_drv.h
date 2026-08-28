@@ -306,6 +306,9 @@ struct virtio_gpu_device {
 
 	struct notifier_block pm_nb;
 
+	struct mutex prime_import_lock;
+	struct drm_file *prime_import_file_priv;
+
 	/* protects uuid state when exporting */
 	spinlock_t resource_export_lock;
 	/* protects map state and host_visible_mm */
@@ -532,6 +535,9 @@ int virtio_gpu_resource_assign_uuid(struct virtio_gpu_device *vgdev,
 				    struct virtio_gpu_object *bo);
 struct dma_buf *virtgpu_gem_prime_export(struct drm_gem_object *obj,
 					 int flags);
+int virtgpu_prime_fd_to_handle(struct drm_device *dev,
+			   struct drm_file *file_priv,
+			   int fd, u32 *handle);
 struct drm_gem_object *virtgpu_gem_prime_import(struct drm_device *dev,
 						struct dma_buf *buf);
 struct drm_gem_object *virtgpu_gem_prime_import_sg_table(
