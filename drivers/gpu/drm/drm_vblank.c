@@ -1020,28 +1020,36 @@ EXPORT_SYMBOL(drm_crtc_vblank_count_and_time);
  */
 int drm_crtc_next_vblank_start(struct drm_crtc *crtc, ktime_t *vblanktime)
 {
+	struct drm_device *dev = crtc->dev;
 	struct drm_vblank_crtc *vblank;
 	struct drm_display_mode *mode;
+	unsigned long irqflags;
 	u64 vblank_start;
+	int ret = -EINVAL;
 
-	if (!drm_dev_has_vblank(crtc->dev))
+	if (!drm_dev_has_vblank(dev))
 		return -EINVAL;
 
 	vblank = drm_crtc_vblank_crtc(crtc);
 	mode = &vblank->hwmode;
 
-	if (!vblank->framedur_ns || !vblank->linedur_ns)
-		return -EINVAL;
+	spin_lock_irqsave(&dev->vblank_time_lock, irqflags);
+
+	if (!vblank->framedur_ns || !vblank->linedur_ns || !mode->crtc_clock)
+		goto out;
 
 	if (!drm_crtc_get_last_vbltimestamp(crtc, vblanktime, false))
-		return -EINVAL;
+		goto out;
 
 	vblank_start = DIV_ROUND_DOWN_ULL(
 			(u64)vblank->framedur_ns * mode->crtc_vblank_start,
 			mode->crtc_vtotal);
 	*vblanktime  = ktime_add(*vblanktime, ns_to_ktime(vblank_start));
+	ret = 0;
+out:
+	spin_unlock_irqrestore(&dev->vblank_time_lock, irqflags);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(drm_crtc_next_vblank_start);
 
@@ -1405,7 +1413,9 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 
 	/* Will be reset by the modeset helpers when re-enabling the crtc by
 	 * calling drm_calc_timestamping_constants(). */
+	spin_lock_irq(&dev->vblank_time_lock);
 	vblank->hwmode.crtc_clock = 0;
+	spin_unlock_irq(&dev->vblank_time_lock);
 
 	/* Wait for any vblank work that's still executing to finish */
 	drm_vblank_flush_worker(vblank);
