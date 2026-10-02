@@ -1207,21 +1207,42 @@ void virtio_gpu_cmd_context_attach_resource(struct virtio_gpu_device *vgdev,
 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
 }
 
+static void virtio_gpu_cmd_context_detach_cb(struct virtio_gpu_device *vgdev,
+					     struct virtio_gpu_vbuffer *vbuf)
+{
+	struct drm_gem_object *obj = vbuf->resp_cb_data;
+
+	vbuf->resp_cb_data = NULL;
+	drm_gem_object_put(obj);
+}
+
 void virtio_gpu_cmd_context_detach_resource(struct virtio_gpu_device *vgdev,
 					    uint32_t ctx_id,
 					    struct virtio_gpu_object_array *objs)
 {
-	struct virtio_gpu_object *bo = gem_to_virtio_gpu_obj(objs->objs[0]);
+	struct drm_gem_object *obj = objs->objs[0];
+	struct virtio_gpu_object *bo = gem_to_virtio_gpu_obj(obj);
 	struct virtio_gpu_ctx_resource *cmd_p;
 	struct virtio_gpu_vbuffer *vbuf;
 
-	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	if (bo->guest_blob) {
+		cmd_p = virtio_gpu_alloc_cmd_cb(vgdev, &vbuf, sizeof(*cmd_p),
+					        virtio_gpu_cmd_context_detach_cb);
+	} else {
+		cmd_p = virtio_gpu_alloc_cmd_cb(vgdev, &vbuf, sizeof(*cmd_p),
+					        NULL);
+	}
 	memset(cmd_p, 0, sizeof(*cmd_p));
 	vbuf->objs = objs;
 
 	cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_CTX_DETACH_RESOURCE);
 	cmd_p->hdr.ctx_id = cpu_to_le32(ctx_id);
 	cmd_p->resource_id = cpu_to_le32(bo->hw_res_handle);
+
+	if (bo->guest_blob) {
+		drm_gem_object_get(obj);
+		vbuf->resp_cb_data = obj;
+	}
 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
 }
 
