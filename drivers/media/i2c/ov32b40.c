@@ -3565,7 +3565,7 @@ static int ov32b40_init_state(struct v4l2_subdev *sd,
 		},
 	};
 
-	ov32b40_set_fmt(sd, state, &fmt);
+	ov32b40_set_fmt(sd, NULL, state, &fmt);
 
 	/* Initialize crop rectangle */
 	crop = v4l2_subdev_state_get_crop(state, 0);
