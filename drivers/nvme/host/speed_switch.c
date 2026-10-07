@@ -327,12 +327,6 @@ void nvme_speed_switch_init(struct nvme_ctrl *ctrl)
 	struct pci_dev *pdev;
 	int max_speed, ret;
 
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_HYGON) {
-		dev_dbg(ctrl->device,
-			"link rate switching is only supported on Hygon platforms\n");
-		return;
-	}
-
 	if (!dev_is_pci(ctrl->dev)) {
 		dev_err(ctrl->device, "link rate switching requires a PCI device\n");
 		return;
