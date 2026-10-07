@@ -137,7 +137,7 @@ config NVME_APPLE
 
 config NVME_SPEED_SWITCH
 	bool "NVMe adaptive PCIe link rate switching"
-	depends on BLK_DEV_NVME && X86
+	depends on BLK_DEV_NVME
 	help
 	  This provides support for dynamic PCIe link rate switching for NVMe
 	  devices. When enabled, the NVMe driver can dynamically adjust the
