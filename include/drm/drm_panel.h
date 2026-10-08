@@ -35,14 +35,36 @@
 struct backlight_device;
 struct dentry;
 struct device_node;
+struct drm_atomic_commit;
 struct drm_bridge;
 struct drm_connector;
+struct drm_connector_state;
+struct drm_crtc_state;
 struct drm_device;
 struct drm_panel_follower;
 struct drm_panel;
+struct drm_printer;
 struct display_timing;
 
 enum drm_panel_orientation;
+
+/**
+ * struct drm_panel_state - Atomic panel state object
+ *
+ * Only panels implementing &drm_panel_funcs.atomic_create_state,
+ * &drm_panel_funcs.atomic_duplicate_state and
+ * &drm_panel_funcs.atomic_destroy_state have a panel state. Panel drivers
+ * that need to track additional state can subclass this structure.
+ */
+struct drm_panel_state {
+	/**
+	 * @base: inherit from &drm_bridge_state
+	 */
+	struct drm_bridge_state base;
+};
+
+#define drm_bridge_state_to_panel_state(bridge_state) \
+	container_of_const(bridge_state, struct drm_panel_state, base)
 
 /**
  * struct drm_panel_funcs - perform operations on a given panel
@@ -148,6 +170,148 @@ struct drm_panel_funcs {
 	 * Allows panels to create panels-specific debugfs files.
 	 */
 	void (*debugfs_init)(struct drm_panel *panel, struct dentry *root);
+
+	/**
+	 * @atomic_check:
+	 *
+	 * Check that the configuration requested in @commit can be handled by
+	 * the panel and compute the new panel state. The new panel state can
+	 * be retrieved with drm_atomic_get_new_panel_state(), the CRTC and
+	 * connector states with drm_atomic_get_new_crtc_state_for_panel() and
+	 * drm_atomic_get_new_connector_state_for_panel().
+	 *
+	 * This function is called in the check phase of an atomic update, it
+	 * must not touch the hardware or any persistent driver data.
+	 *
+	 * This function is optional. It can only be implemented together with
+	 * @atomic_create_state.
+	 *
+	 * Return:
+	 *
+	 * Zero if the check passed, a negative error code otherwise.
+	 */
+	int (*atomic_check)(struct drm_panel *panel,
+			    struct drm_atomic_commit *commit);
+
+	/**
+	 * @atomic_prepare:
+	 *
+	 * Atomic variant of @prepare, used instead of it if implemented. The
+	 * new panel state can be retrieved from @commit with
+	 * drm_atomic_get_new_panel_state().
+	 *
+	 * Panels using atomic state can only be used through the bridge
+	 * embedded in the panel, drm_panel_prepare() and its counterparts
+	 * will refuse to handle them.
+	 *
+	 * This function is optional. It can only be implemented together with
+	 * @atomic_create_state.
+	 */
+	int (*atomic_prepare)(struct drm_panel *panel,
+			      struct drm_atomic_commit *commit);
+
+	/**
+	 * @atomic_enable:
+	 *
+	 * Atomic variant of @enable, used instead of it if implemented. See
+	 * @atomic_prepare for details.
+	 *
+	 * This function is optional.
+	 */
+	int (*atomic_enable)(struct drm_panel *panel,
+			     struct drm_atomic_commit *commit);
+
+	/**
+	 * @atomic_disable:
+	 *
+	 * Atomic variant of @disable, used instead of it if implemented. See
+	 * @atomic_prepare for details.
+	 *
+	 * The panel might not be routed to a connector or driven by a CRTC
+	 * anymore in @commit, the state the panel has been enabled with can
+	 * be retrieved with drm_atomic_get_old_panel_state().
+	 *
+	 * This function is optional.
+	 */
+	int (*atomic_disable)(struct drm_panel *panel,
+			      struct drm_atomic_commit *commit);
+
+	/**
+	 * @atomic_unprepare:
+	 *
+	 * Atomic variant of @unprepare, used instead of it if implemented.
+	 * See @atomic_prepare and @atomic_disable for details.
+	 *
+	 * This function is optional.
+	 */
+	int (*atomic_unprepare)(struct drm_panel *panel,
+				struct drm_atomic_commit *commit);
+
+	/**
+	 * @atomic_create_state:
+	 *
+	 * Allocate a pristine, initialized, state for the panel and return
+	 * it. This callback must have no side effects: in particular, it must
+	 * not affect the hardware state.
+	 *
+	 * Drivers that subclass &drm_panel_state should use
+	 * __drm_atomic_helper_panel_state_init() to initialize the base
+	 * structure, the other drivers should use
+	 * drm_atomic_helper_panel_create_state().
+	 *
+	 * This function is optional, panels not implementing it don't have a
+	 * panel state. It must be implemented together with
+	 * @atomic_duplicate_state and @atomic_destroy_state.
+	 *
+	 * Return:
+	 *
+	 * A new, pristine, panel state instance or an error pointer on
+	 * failure.
+	 */
+	struct drm_panel_state *(*atomic_create_state)(struct drm_panel *panel);
+
+	/**
+	 * @atomic_duplicate_state:
+	 *
+	 * Duplicate the current panel state and return it.
+	 *
+	 * Drivers that subclass &drm_panel_state should use
+	 * __drm_atomic_helper_panel_duplicate_state() to duplicate the base
+	 * structure, the other drivers should use
+	 * drm_atomic_helper_panel_duplicate_state().
+	 *
+	 * This function is optional. It must be implemented together with
+	 * @atomic_create_state and @atomic_destroy_state.
+	 *
+	 * Return:
+	 *
+	 * A valid &drm_panel_state object or NULL if the allocation fails.
+	 */
+	struct drm_panel_state *(*atomic_duplicate_state)(struct drm_panel *panel);
+
+	/**
+	 * @atomic_destroy_state:
+	 *
+	 * Destroy a panel state object previously allocated by
+	 * @atomic_create_state or @atomic_duplicate_state. Drivers that don't
+	 * subclass &drm_panel_state should use
+	 * drm_atomic_helper_panel_destroy_state().
+	 *
+	 * This function is optional. It must be implemented together with
+	 * @atomic_create_state and @atomic_duplicate_state.
+	 */
+	void (*atomic_destroy_state)(struct drm_panel *panel,
+				     struct drm_panel_state *state);
+
+	/**
+	 * @atomic_print_state:
+	 *
+	 * If driver subclasses &struct drm_panel_state, it should implement
+	 * this optional hook for printing additional driver specific state.
+	 * It can only be implemented together with @atomic_create_state.
+	 */
+	void (*atomic_print_state)(struct drm_printer *p,
+				   const struct drm_panel_state *state);
 };
 
 struct drm_panel_follower_funcs {
@@ -343,6 +507,32 @@ void drm_panel_enable(struct drm_panel *panel);
 void drm_panel_disable(struct drm_panel *panel);
 
 int drm_panel_get_modes(struct drm_panel *panel, struct drm_connector *connector);
+
+void __drm_atomic_helper_panel_state_init(struct drm_panel_state *state,
+					  struct drm_panel *panel);
+void __drm_atomic_helper_panel_duplicate_state(struct drm_panel *panel,
+					       struct drm_panel_state *state);
+struct drm_panel_state *
+drm_atomic_helper_panel_create_state(struct drm_panel *panel);
+struct drm_panel_state *
+drm_atomic_helper_panel_duplicate_state(struct drm_panel *panel);
+void drm_atomic_helper_panel_destroy_state(struct drm_panel *panel,
+					   struct drm_panel_state *state);
+
+struct drm_panel_state *drm_panel_get_current_state(struct drm_panel *panel);
+
+struct drm_panel_state *
+drm_atomic_get_old_panel_state(const struct drm_atomic_commit *commit,
+			       struct drm_panel *panel);
+struct drm_panel_state *
+drm_atomic_get_new_panel_state(const struct drm_atomic_commit *commit,
+			       struct drm_panel *panel);
+struct drm_crtc_state *
+drm_atomic_get_new_crtc_state_for_panel(struct drm_atomic_commit *commit,
+					struct drm_panel *panel);
+struct drm_connector_state *
+drm_atomic_get_new_connector_state_for_panel(const struct drm_atomic_commit *commit,
+					     struct drm_panel *panel);
 
 #if defined(CONFIG_OF) && IS_ENABLED(CONFIG_DRM_PANEL)
 struct drm_panel *of_drm_find_panel(const struct device_node *np);
