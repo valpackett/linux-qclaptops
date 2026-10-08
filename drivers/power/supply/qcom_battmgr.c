@@ -1339,6 +1339,11 @@ static void qcom_battmgr_sc8280xp_callback(struct qcom_battmgr *battmgr,
 
 		state = le32_to_cpu(resp->status.battery_state);
 		power_state = le32_to_cpu(resp->status.power_state);
+		battmgr->status.capacity = le32_to_cpu(resp->status.capacity) * 1000;
+		battmgr->status.power_now = le32_to_cpu(resp->status.rate) * 1000;
+		battmgr->status.voltage_now = le32_to_cpu(resp->status.battery_voltage) * 1000;
+		battmgr->status.temperature = qcom_battmgr_sc8280xp_convert_temp(le32_to_cpu(resp->status.temperature));
+
 		if (state & BIT(0))
 			battmgr->status.status = POWER_SUPPLY_STATUS_DISCHARGING;
 		else if (state & BIT(1))
