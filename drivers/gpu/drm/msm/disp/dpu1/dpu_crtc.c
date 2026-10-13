@@ -1077,6 +1077,19 @@ static int _dpu_crtc_wait_for_frame_done(struct drm_crtc *crtc)
 	return rc;
 }
 
+/* Must precede the kickoff: the frame-done can be handled before it returns. */
+static void dpu_crtc_count_pending_frame(struct drm_crtc *crtc)
+{
+	struct dpu_crtc *dpu_crtc = to_dpu_crtc(crtc);
+
+	if (atomic_inc_return(&dpu_crtc->frame_pending) == 1) {
+		/* acquire bandwidth and other resources */
+		DRM_DEBUG_ATOMIC("crtc%d first commit\n", crtc->base.id);
+	} else {
+		DRM_DEBUG_ATOMIC("crtc%d commit\n", crtc->base.id);
+	}
+}
+
 static int dpu_crtc_kickoff_clone_mode(struct drm_crtc *crtc)
 {
 	struct drm_encoder *encoder;
@@ -1101,6 +1114,8 @@ static int dpu_crtc_kickoff_clone_mode(struct drm_crtc *crtc)
 	dpu_encoder_prepare_for_kickoff(rt_encoder);
 
 	dpu_vbif_clear_errors(dpu_kms);
+
+	dpu_crtc_count_pending_frame(crtc);
 
 	/*
 	 * Kickoff real time encoder last as it's the encoder that
@@ -1159,18 +1174,14 @@ void dpu_crtc_commit_kickoff(struct drm_crtc *crtc)
 
 		dpu_vbif_clear_errors(dpu_kms);
 
+		dpu_crtc_count_pending_frame(crtc);
+
 		drm_for_each_encoder_mask(encoder, crtc->dev,
 				crtc->state->encoder_mask) {
 			dpu_encoder_kickoff(encoder);
 			dpu_encoder_start_frame_done_timer(encoder);
 		}
 	}
-
-	if (atomic_inc_return(&dpu_crtc->frame_pending) == 1) {
-		/* acquire bandwidth and other resources */
-		DRM_DEBUG_ATOMIC("crtc%d first commit\n", crtc->base.id);
-	} else
-		DRM_DEBUG_ATOMIC("crtc%d commit\n", crtc->base.id);
 
 	dpu_crtc->play_count++;
 
