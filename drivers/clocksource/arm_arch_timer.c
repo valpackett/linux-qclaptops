@@ -587,10 +587,36 @@ static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
 	return timer_handler(ARCH_TIMER_PHYS_ACCESS, evt);
 }
 
+/*
+ * On Qualcomm X1E the secure firmware derives the APSS wake-up deadline for
+ * cluster/system power collapse from the timer the kernel ticks on, and
+ * reads its CVAL even when the timer is disabled. A stopped timer whose CVAL
+ * is in the past makes it return from every system-level idle entry at once.
+ * When the kernel owns EL2 (VHE or nVHE host), park stopped timers far in the
+ * future instead, enabled but masked, like Windows does.
+ */
+#define ARCH_TIMER_PARK_TICKS	(1ULL << 44)	/* ~10 days at 19.2 MHz */
+
+static __always_inline void arch_timer_park(const int access)
+{
+	u64 cnt = access == ARCH_TIMER_PHYS_ACCESS ? __arch_counter_get_cntpct() :
+						      __arch_counter_get_cntvct();
+
+	arch_timer_reg_write_cp15(access, ARCH_TIMER_REG_CTRL, ARCH_TIMER_CTRL_IT_MASK);
+	arch_timer_reg_write_cp15(access, ARCH_TIMER_REG_CVAL, cnt + ARCH_TIMER_PARK_TICKS);
+	arch_timer_reg_write_cp15(access, ARCH_TIMER_REG_CTRL,
+				  ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_MASK);
+}
+
 static __always_inline int arch_timer_shutdown(const int access,
 					       struct clock_event_device *clk)
 {
 	unsigned long ctrl;
+
+	if (is_hyp_mode_available()) {
+		arch_timer_park(access);
+		return 0;
+	}
 
 	ctrl = arch_timer_reg_read_cp15(access, ARCH_TIMER_REG_CTRL);
 	ctrl &= ~ARCH_TIMER_CTRL_ENABLE;
