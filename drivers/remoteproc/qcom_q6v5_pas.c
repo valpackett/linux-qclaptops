@@ -643,6 +643,13 @@ static const struct rproc_ops qcom_pas_minidump_ops = {
 	.attach = qcom_pas_attach,
 };
 
+static const struct rproc_ops qcom_pas_ops_no_reset = {
+	.stop = qcom_pas_stop,
+	.da_to_va = qcom_pas_da_to_va,
+	.panic = qcom_pas_panic,
+	.attach = qcom_pas_attach,
+};
+
 static int qcom_pas_init_clock(struct qcom_pas *pas)
 {
 	pas->xo = devm_clk_get(pas->dev, "xo");
@@ -912,6 +919,7 @@ static int qcom_pas_probe(struct platform_device *pdev)
 	struct device_node *node;
 	const char *fw_name, *dtb_fw_name = NULL;
 	const struct rproc_ops *ops = &qcom_pas_ops;
+	bool broken_reset;
 	int ret;
 
 	desc = of_device_get_match_data(&pdev->dev);
@@ -937,6 +945,10 @@ static int qcom_pas_probe(struct platform_device *pdev)
 
 	if (desc->minidump_id)
 		ops = &qcom_pas_minidump_ops;
+
+	broken_reset = device_property_read_bool(&pdev->dev, "qcom,broken-reset");
+	if (broken_reset)
+		ops = &qcom_pas_ops_no_reset;
 
 	rproc = devm_rproc_alloc(&pdev->dev, desc->sysmon_name, ops, fw_name, sizeof(*pas));
 
@@ -1024,7 +1036,7 @@ static int qcom_pas_probe(struct platform_device *pdev)
 	if (pas->dtb_pas_id)
 		pas->dtb_pas_ctx->use_tzmem = desc->needs_tzmem || rproc->has_iommu;
 
-	if (desc->early_boot)
+	if (desc->early_boot || broken_reset)
 		pas->rproc->state = RPROC_DETACHED;
 
 	ret = qcom_pas_setup_tmd(pas, desc);
