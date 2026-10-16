@@ -1681,6 +1681,12 @@ int pci_force_enable_link_state(struct pci_dev *pdev, int state)
 }
 EXPORT_SYMBOL(pci_force_enable_link_state);
 
+int pci_force_enable_link_state_locked(struct pci_dev *pdev, int state)
+{
+	return __pci_enable_link_state(pdev, state, true, true);
+}
+EXPORT_SYMBOL(pci_force_enable_link_state_locked);
+
 void pcie_aspm_remove_cap(struct pci_dev *pdev, u32 lnkcap)
 {
 	if (lnkcap & PCI_EXP_LNKCAP_ASPM_L0S)
