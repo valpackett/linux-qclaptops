@@ -4542,6 +4542,12 @@ L:	linux-sound@vger.kernel.org
 S:	Maintained
 F:	sound/hda/codecs/side-codecs/aw88399*
 
+AWINIC AW99703 WLED BACKLIGHT DRIVER
+M:	Luka Panio <lukapanio@gmail.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/leds/backlight/awinic,aw99703.yaml
+F:	drivers/video/backlight/aw99703.c
+
 AWINIC AW99706 WLED BACKLIGHT DRIVER
 M:	Junjie Cao <junjie.cao@linux.dev>
 S:	Maintained
