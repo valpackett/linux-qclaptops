@@ -413,9 +413,15 @@ static irqreturn_t qcom_dwc3_resume_irq(int irq, void *data)
 	/*
 	 * This is safe as role switching is done from a freezable workqueue
 	 * and the wakeup interrupts are disabled as part of resume.
+	 *
+	 * The DP and DM wakeup interrupts can fire together. A bare resume
+	 * from the second one cancels the suspend request queued after the
+	 * first one, leaving the controller active, so balance it with a put.
 	 */
-	if (dwc3_qcom_is_host(qcom))
-		pm_runtime_resume(&dwc->xhci->dev);
+	if (dwc3_qcom_is_host(qcom)) {
+		pm_runtime_get_sync(&dwc->xhci->dev);
+		pm_runtime_put_autosuspend(&dwc->xhci->dev);
+	}
 
 	return IRQ_HANDLED;
 }
