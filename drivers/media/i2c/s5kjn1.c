@@ -727,6 +727,7 @@ static const struct s5kjn1_mode s5kjn1_supported_modes[] = {
 			.num_regs = ARRAY_SIZE(s5kjn1_4080x3072_30fps_mode),
 		},
 	},
+#ifdef NOTYET_QUAD_BAYER
 	{
 		.width = 8160,
 		.height = 6144,
@@ -739,6 +740,7 @@ static const struct s5kjn1_mode s5kjn1_supported_modes[] = {
 			.num_regs = ARRAY_SIZE(s5kjn1_8160x6144_10fps_mode),
 		},
 	},
+#endif
 };
 
 static int s5kjn1_set_ctrl(struct v4l2_ctrl *ctrl)
