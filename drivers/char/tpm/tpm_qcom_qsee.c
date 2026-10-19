@@ -32,6 +32,10 @@
 
 #define QCOM_TPM_QSEE_CMD_QUERY_INFO_2	(0x4000 | 18)
 #define QCOM_TPM_QSEE_CMD_SEND_COMMAND	(0x4000 | 8)
+#define QCOM_TPM_QSEE_CMD_TRANSFER	2
+
+#define QCOM_TPM_QSEE_TRANSFER_END	0
+#define QCOM_TPM_QSEE_TRANSFER_START	1
 
 struct qcom_tpm_qsee_control_area {
 	__le32 request;
@@ -80,6 +84,11 @@ struct qcom_tpm_qsee_send_rsp {
 	u8 output[QCOM_TPM_QSEE_MAX_TA_DATA_SIZE];
 } __packed;
 
+struct qcom_tpm_qsee_transfer_msg {
+	__le32 command_id;
+	__le32 state;
+} __packed;
+
 /**
  * struct qcom_tpm_qsee - Qualcomm QSEE TPM driver state.
  * @client: QSEECOM client for qcom.tz.tpm.
@@ -88,6 +97,7 @@ struct qcom_tpm_qsee_send_rsp {
  * @control_area: Mapped TPM control area.
  * @control_area_phys: Physical address of the TPM control area.
  * @control_area_shm_bridge: SHM bridge handle for the TPM control area.
+ * @is_dtpm: The backend is a discrete TPM behind a TrustZone-owned SPI bus.
  * @lock: Serializes access to the TPM control area and TA command path.
  */
 struct qcom_tpm_qsee {
@@ -97,6 +107,7 @@ struct qcom_tpm_qsee {
 	void __iomem *control_area;
 	phys_addr_t control_area_phys;
 	u64 control_area_shm_bridge;
+	bool is_dtpm;
 	/* Serializes access to the TPM control area and TA command path. */
 	struct mutex lock;
 };
@@ -304,9 +315,53 @@ out_unlock:
 	return ret;
 }
 
+/*
+ * The TA keeps the dTPM SPI bus, and its DDR/QUP interconnect votes, open while
+ * a transfer is held. Release closes it only once QUERY_INFO_2 has been sent.
+ * Best effort: without a hold the TA closes the bus itself after each command,
+ * so a failure here must not fail the TPM operation or skip go_idle.
+ */
+static void qcom_tpm_qsee_transfer(struct tpm_chip *chip, u32 state)
+{
+	struct qcom_tpm_qsee *qtpm = dev_get_drvdata(chip->dev.parent);
+	struct qcom_tpm_qsee_transfer_msg req = {
+		.command_id = cpu_to_le32(QCOM_TPM_QSEE_CMD_TRANSFER),
+		.state = cpu_to_le32(state),
+	};
+	struct qcom_tpm_qsee_transfer_msg rsp;
+	int ret;
+
+	if (!qtpm->is_dtpm)
+		return;
+
+	/* chip->tpm_mutex already serializes cmd_ready, send and go_idle. */
+	ret = qcom_tpm_qsee_app_send(qtpm, &req, sizeof(req), &rsp, sizeof(rsp));
+	/* The TA acknowledges with {2, 0}; it does not report the close result. */
+	if (!ret && (le32_to_cpu(rsp.command_id) != QCOM_TPM_QSEE_CMD_TRANSFER ||
+		     rsp.state))
+		ret = -EIO;
+	if (ret)
+		dev_warn_ratelimited(&chip->dev, "transfer %u failed: %d\n",
+				     state, ret);
+}
+
+static int qcom_tpm_qsee_cmd_ready(struct tpm_chip *chip)
+{
+	qcom_tpm_qsee_transfer(chip, QCOM_TPM_QSEE_TRANSFER_START);
+	return 0;
+}
+
+static int qcom_tpm_qsee_go_idle(struct tpm_chip *chip)
+{
+	qcom_tpm_qsee_transfer(chip, QCOM_TPM_QSEE_TRANSFER_END);
+	return 0;
+}
+
 static const struct tpm_class_ops qcom_tpm_qsee_ops = {
 	.flags = TPM_OPS_AUTO_STARTUP,
 	.send = qcom_tpm_qsee_send,
+	.cmd_ready = qcom_tpm_qsee_cmd_ready,
+	.go_idle = qcom_tpm_qsee_go_idle,
 };
 
 static int qcom_tpm_qsee_probe(struct auxiliary_device *aux_dev,
@@ -339,15 +394,19 @@ static int qcom_tpm_qsee_probe(struct auxiliary_device *aux_dev,
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to query TPM type\n");
 
-	if (tpm_type != QCOM_TPM_TYPE_FTPM) {
+	if (tpm_type != QCOM_TPM_TYPE_FTPM && tpm_type != QCOM_TPM_TYPE_DTPM) {
 		dev_err(dev, "unsupported TPM type %#llx (%s)\n",
 			tpm_type, qcom_tpm_type_name(tpm_type));
 		return -ENODEV;
 	}
+	qtpm->is_dtpm = tpm_type == QCOM_TPM_TYPE_DTPM;
 
 	ret = qcom_tpm_qsee_query_info(qtpm);
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to query TPM app info\n");
+
+	dev_info(dev, "%s, control area %pa\n", qcom_tpm_type_name(tpm_type),
+		 &qtpm->control_area_phys);
 
 	qtpm->control_area = devm_ioremap_wc(dev, qtpm->control_area_phys,
 					     QCOM_TPM_QSEE_CONTROL_AREA_SIZE);
