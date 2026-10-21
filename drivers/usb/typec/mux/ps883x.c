@@ -236,6 +236,15 @@ static int ps883x_set(struct ps883x_retimer *retimer, struct typec_retimer_state
 	int cfg2 = 0x00;
 	bool reset = false;
 
+	/*
+	 * The safe state never needs the retimer powered. The Type-C class
+	 * sends it with the alternate mode still set when the mode is exited,
+	 * which can happen after a disconnect already put the retimer in
+	 * reset: don't take that as a DP configuration and power it back up.
+	 */
+	if (state->mode == TYPEC_STATE_SAFE && retimer->in_reset)
+		return 0;
+
 	if (retimer->orientation == TYPEC_ORIENTATION_REVERSE)
 		cfg0 |= CONN_STATUS_0_ORIENTATION_REVERSED;
 
