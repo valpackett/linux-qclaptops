@@ -336,9 +336,43 @@ static int xhci_portsc_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+/*
+ * Keep the host controller resumed while a port file is open, as its
+ * registers may not be accessible when it is runtime suspended. A port
+ * that is not part of a roothub has no hcd to resume.
+ */
+static int xhci_port_pm_open(struct inode *inode, struct file *file,
+			     int (*show)(struct seq_file *, void *))
+{
+	struct xhci_port *port = inode->i_private;
+	int ret;
+
+	if (port->rhub) {
+		ret = pm_runtime_resume_and_get(port->rhub->hcd->self.controller);
+		if (ret)
+			return ret;
+	}
+
+	ret = single_open(file, show, port);
+	if (ret && port->rhub)
+		pm_runtime_put(port->rhub->hcd->self.controller);
+
+	return ret;
+}
+
+static int xhci_port_release(struct inode *inode, struct file *file)
+{
+	struct xhci_port *port = inode->i_private;
+
+	if (port->rhub)
+		pm_runtime_put(port->rhub->hcd->self.controller);
+
+	return single_release(inode, file);
+}
+
 static int xhci_port_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, xhci_portsc_show, inode->i_private);
+	return xhci_port_pm_open(inode, file, xhci_portsc_show);
 }
 
 static ssize_t xhci_port_write(struct file *file,  const char __user *ubuf,
@@ -381,7 +415,7 @@ static const struct file_operations port_fops = {
 	.write                  = xhci_port_write,
 	.read			= seq_read,
 	.llseek			= seq_lseek,
-	.release		= single_release,
+	.release		= xhci_port_release,
 };
 
 static int xhci_portli_show(struct seq_file *s, void *unused)
@@ -415,14 +449,14 @@ static int xhci_portli_show(struct seq_file *s, void *unused)
 
 static int xhci_portli_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, xhci_portli_show, inode->i_private);
+	return xhci_port_pm_open(inode, file, xhci_portli_show);
 }
 
 static const struct file_operations portli_fops = {
 	.open			= xhci_portli_open,
 	.read			= seq_read,
 	.llseek			= seq_lseek,
-	.release		= single_release,
+	.release		= xhci_port_release,
 };
 
 static void xhci_debugfs_create_files(struct xhci_hcd *xhci,
