@@ -42,6 +42,8 @@ xsi:schemaLocation="https://gitlab.freedesktop.org/freedreno/ rules-fd.xsd">
 
 	<reg32 offset="0x1a880" name="GPU_GMU_GX_SPTPRAC_CLOCK_CONTROL"/>
 	<reg32 offset="0x1a881" name="GMU_GX_SPTPRAC_POWER_CONTROL"/>
+	<reg32 offset="0x1a883" name="GMU_GX_GMU_SP_RF_CONTROL_0"/>
+	<reg32 offset="0x1a884" name="GMU_GX_GMU_SP_RF_CONTROL_1"/>
 	<reg32 offset="0x1b400" name="GMU_CM3_ITCM_START"/>
 	<reg32 offset="0x1c400" name="GMU_CM3_DTCM_START"/>
 	<reg32 offset="0x1cbf0" name="GMU_NMI_CONTROL_STATUS"/>
