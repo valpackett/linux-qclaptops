@@ -5,6 +5,7 @@
  */
 #include <linux/module.h>
 #include <linux/netlink.h>
+#include <linux/pm_wakeup.h>
 #include <linux/qrtr.h>
 #include <linux/termios.h>	/* For TIOCINQ/OUTQ */
 #include <linux/spinlock.h>
@@ -462,6 +463,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	size_t size;
 	unsigned int ver;
 	size_t hdrlen;
+	bool wake;
 
 	if (len == 0 || len & 3)
 		return -EINVAL;
@@ -555,10 +557,26 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 		if (!ipc)
 			goto err;
 
+		/*
+		 * If userspace is frozen for a system suspend, nothing reads
+		 * this packet until something else wakes the system: an
+		 * incoming call or message would go unnoticed. Let the
+		 * endpoint wake the system, if wakeup is enabled for it.
+		 * Kernel sockets (the name service, in-kernel QMI clients) are
+		 * served while suspending, and their traffic must not abort
+		 * the suspend. Decide before queueing: once queued, the skb
+		 * belongs to the socket and may already be freed.
+		 */
+		wake = ep->wakeup_dev && cb->type == QRTR_TYPE_DATA &&
+		       !ipc->sk.sk_kern_sock;
+
 		if (sock_queue_rcv_skb(&ipc->sk, skb)) {
 			qrtr_port_put(ipc);
 			goto err;
 		}
+
+		if (wake)
+			pm_wakeup_dev_event(ep->wakeup_dev, 0, true);
 
 		qrtr_port_put(ipc);
 	}

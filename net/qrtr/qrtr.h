@@ -4,6 +4,7 @@
 
 #include <linux/types.h>
 
+struct device;
 struct sk_buff;
 
 /* endpoint node id auto assignment */
@@ -12,6 +13,8 @@ struct sk_buff;
 /**
  * struct qrtr_endpoint - endpoint handle
  * @xmit: Callback for outgoing packets
+ * @wakeup_dev: Device to report a wakeup event on when a data packet from
+ *	this endpoint is queued for a userspace socket, or NULL
  *
  * The socket buffer passed to the xmit function becomes owned by the endpoint
  * driver.  As such, when the driver is done with the buffer, it should
@@ -19,6 +22,7 @@ struct sk_buff;
  */
 struct qrtr_endpoint {
 	int (*xmit)(struct qrtr_endpoint *ep, struct sk_buff *skb);
+	struct device *wakeup_dev;
 	/* private: not for endpoint use */
 	struct qrtr_node *node;
 };
