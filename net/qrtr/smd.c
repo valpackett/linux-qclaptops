@@ -4,6 +4,7 @@
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  */
 
+#include <linux/device.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/skbuff.h>
@@ -73,20 +74,33 @@ static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 
 	qdev->dev = &rpdev->dev;
 	qdev->ep.xmit = qcom_smd_qrtr_send;
+	qdev->ep.wakeup_dev = &rpdev->dev;
+
+	/*
+	 * Packets from the remote, such as an incoming call or SMS from the
+	 * modem, may wake the system. Keep it disabled by default, so that
+	 * userspace enables it only for the remotes it wants to be woken by.
+	 */
+	device_set_wakeup_capable(&rpdev->dev, true);
 
 	rc = devm_mutex_init(&rpdev->dev, &qdev->send_lock);
-	if (rc)
+	if (rc) {
+		device_init_wakeup(&rpdev->dev, false);
 		return rc;
+	}
 
 	/* Block sending until we have fully opened the channel */
 	guard(mutex)(&qdev->send_lock);
 
 	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
-	if (rc)
+	if (rc) {
+		device_init_wakeup(&rpdev->dev, false);
 		return rc;
+	}
 
 	qdev->channel = rpmsg_dev_open_ept(rpdev, qcom_smd_qrtr_callback, qdev);
 	if (!qdev->channel) {
+		device_init_wakeup(&rpdev->dev, false);
 		qrtr_endpoint_unregister(&qdev->ep);
 		return -EREMOTEIO;
 	}
@@ -111,6 +125,7 @@ static void qcom_smd_qrtr_remove(struct rpmsg_device *rpdev)
 
 	rpmsg_destroy_ept(ept);
 	qrtr_endpoint_unregister(&qdev->ep);
+	device_init_wakeup(&rpdev->dev, false);
 }
 
 static const struct rpmsg_device_id qcom_smd_qrtr_smd_match[] = {
