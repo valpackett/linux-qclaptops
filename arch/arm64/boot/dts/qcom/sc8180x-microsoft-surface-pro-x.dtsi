@@ -178,6 +178,20 @@
 		vin-supply = <&vph_pwr>;
 	};
 
+	vreg_ts_5p0: regulator-ts-5p0 {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_ts_5p0";
+
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		gpio = <&pmc8180_2_gpios 10 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_5v_en_default>;
+	};
+
 	vph_pwr: regulator-vph-pwr {
 		compatible = "regulator-fixed";
 		regulator-name = "vph_pwr";
@@ -569,6 +583,11 @@
 		pins = "gpio1";
 		function = "normal";
 	};
+
+	ts_5v_en_default: ts-5v-en-default-state {
+		pins = "gpio10";
+		function = "normal";
+	};
 };
 
 &pmc8180_adc {
@@ -612,6 +631,10 @@
 	status = "okay";
 };
 
+&qupv3_id_0 {
+	status = "okay";
+};
+
 &qupv3_id_2 {
 	status = "okay";
 };
@@ -638,6 +661,30 @@
 
 &smb2351_1 {
 	status = "disabled";
+};
+
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_active>;
+
+	status = "okay";
+
+	hid@0 {
+		compatible = "hid-over-spi";
+
+		reg = <0>;
+		spi-max-frequency = <25000000>;
+
+		interrupts-extended = <&tlmm 122 IRQ_TYPE_EDGE_FALLING>;
+
+		vdd-supply = <&vreg_ts_5p0>;
+
+		pinctrl-0 = <&spi1_hid0_reset_deassert &spi1_hid0_int_bias>;
+		pinctrl-1 = <&spi1_hid0_reset_assert &spi1_hid0_int_unbias>;
+		pinctrl-2 = <&spi1_hid0_reset_assert &spi1_hid0_int_bias>;
+		pinctrl-names = "active", "sleep", "reset";
+		hid-descr-addr = <1>;
+	};
 };
 
 &spmi_bus {
@@ -746,6 +793,56 @@
 
 			bias-pull-up;
 		};
+	};
+
+	spi1_active: spi1-active-state {
+		pins = "gpio114", "gpio115", "gpio116", "gpio117";
+		function = "qup1";
+
+		drive-strength = <6>;
+		bias-disable;
+	};
+
+	spi1_hid0_reset: spi1-hid1-reset {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+
+		bias-disable;
+	};
+
+	spi1_hid0_reset_deassert: spi1-hid1-reset-deassert {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+
+		bias-disable;
+		output-high;
+	};
+
+	spi1_hid0_reset_assert: spi1-hid1-reset-assert {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+
+		bias-disable;
+		output-low;
+	};
+
+	spi1_hid0_int_bias: spi1-hid1-int-bias {
+		pins = "gpio122";
+		function = "gpio";
+
+		input-enable;
+		bias-pull-up;
+	};
+
+	spi1_hid0_int_unbias: spi1-hid1-int-unbias {
+		pins = "gpio122";
+		function = "gpio";
+
+		input-enable;
+		bias-disable;
 	};
 
 	panel_vdd_en_default: panel-vdd-en-default-state {
