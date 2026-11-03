@@ -1279,8 +1279,11 @@ static int hw_init(struct msm_gpu *gpu)
 	if (!(adreno_is_a650_family(adreno_gpu) ||
 	      adreno_is_a702(adreno_gpu) ||
 	      adreno_is_a730(adreno_gpu))) {
-		gmem_range_min = (adreno_is_a740_family(adreno_gpu) ||
-				  adreno_is_a722(adreno_gpu)) ? SZ_16M : SZ_1M;
+		gmem_range_min = SZ_1M;
+		if (adreno_is_a740_family(adreno_gpu) || adreno_is_a722(adreno_gpu))
+			gmem_range_min = SZ_16M;
+		else if (adreno_is_a680(adreno_gpu))
+			gmem_range_min = 0;
 
 		/* Set the GMEM VA range [0x100000:0x100000 + gpu->gmem - 1] */
 		gpu_write64(gpu, REG_A6XX_UCHE_GMEM_RANGE_MIN, gmem_range_min);

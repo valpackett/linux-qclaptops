@@ -384,7 +384,8 @@ int adreno_get_param(struct msm_gpu *gpu, struct msm_context *ctx,
 	case MSM_PARAM_GMEM_BASE:
 		if (adreno_gpu->info->family >= ADRENO_8XX_GEN1)
 			*value = SZ_64M;
-		else if (adreno_gpu->info->family >= ADRENO_6XX_GEN3)
+		else if (adreno_gpu->info->family >= ADRENO_6XX_GEN3 ||
+			adreno_is_a680(adreno_gpu))
 			*value = 0;
 		else
 			*value = 0x100000;
