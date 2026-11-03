@@ -218,6 +218,20 @@
 
 		vin-supply = <&vph_pwr>;
 	};
+
+	vreg_ts_5p0: ts-5p0-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_ts_5p0";
+
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		gpio = <&pmc8180_2_gpios 10 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_5v_en_default_state>;
+	};
 };
 
 &apps_rsc {
@@ -431,6 +445,53 @@
 		};
 	};
 
+	spi1_active: spi1-active-state {
+		pins = "gpio114", "gpio115", "gpio116", "gpio117";
+		function = "qup1";
+
+		drive-strength = <6>;
+		bias-disable;
+	};
+
+	spi1_hid0_reset: spi1-hid1-reset {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	spi1_hid0_reset_deassert: spi1-hid1-reset-deassert {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-high;
+	};
+
+	spi1_hid0_reset_assert: spi1-hid1-reset-assert {
+		pins = "gpio54";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	spi1_hid0_int_bias: spi1-hid1-int-bias {
+		pins = "gpio122";
+		function = "gpio";
+
+		input-enable;
+		bias-pull-up;
+	};
+
+	spi1_hid0_int_unbias: spi1-hid1-int-unbias {
+		pins = "gpio122";
+		function = "gpio";
+
+		input-enable;
+		bias-disable;
+	};
+
 	uart13_state: uart13-state {
 		cts {
 			pins = "gpio43";
@@ -592,6 +653,11 @@
 &pmc8180_2_gpios {
 	bl_en_default_state: bl-pwm-default-state {
 		pins = "gpio1";
+		function = "normal";
+	};
+
+	ts_5v_en_default_state: ts-5v-en-default-state {
+		pins = "gpio10";
 		function = "normal";
 	};
 };
@@ -788,6 +854,10 @@
 	wake-gpios = <&tlmm 104 GPIO_ACTIVE_LOW>;
 };
 
+&qupv3_id_1 {
+	status = "okay";
+};
+
 &remoteproc_adsp {
 	memory-region = <&adsp_mem>;
 };
@@ -802,6 +872,44 @@
 
 &remoteproc_slpi {
 	memory-region = <&slpi_mem>;
+};
+
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_active>;
+
+	status = "okay";
+
+	hid@0 {
+		compatible = "hid-over-spi";
+
+		reg = <0>;
+		spi-max-frequency = <25000000>;
+		// spi-max-frequency = <12500000>;
+
+		interrupts-extended = <&tlmm 122 IRQ_TYPE_EDGE_FALLING>;
+
+		vdd-supply = <&vreg_ts_5p0>;
+
+		// OLD DRV
+		pinctrl-0 = <&spi1_hid0_reset_deassert &spi1_hid0_int_bias>;
+		pinctrl-1 = <&spi1_hid0_reset_assert &spi1_hid0_int_unbias>;
+		pinctrl-2 = <&spi1_hid0_reset_assert &spi1_hid0_int_bias>;
+		pinctrl-names = "active", "sleep", "reset";
+		hid-descr-addr = <1>;
+
+		// NEW DRV
+		// pinctrl-0 = <&spi1_hid0_reset &spi1_hid0_int_bias>;
+		// pinctrl-1 = <&spi1_hid0_reset &spi1_hid0_int_unbias>;
+		// pinctrl-2 = <&spi1_hid0_reset &spi1_hid0_int_bias>;
+		// reset-gpios = <&tlmm 54 GPIO_ACTIVE_LOW>;
+		// input-report-header-address = <0x1000>;
+		// input-report-body-address = <0x1004>;
+		// output-report-address = <0x2000>;
+		// read-opcode = <0x0b>;
+		// write-opcode = <0x02>;
+		// hid-over-spi-flags = <0x0000>;
+	};
 };
 
 &uart13 {
