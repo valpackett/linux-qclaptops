@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+/dts-v1/;
+
+#include "sc8180x-microsoft-surface-pro-x.dtsi"
+
+/ {
+	model = "Microsoft Surface Pro X (SQ1)";
+	compatible = "microsoft,cambria", "qcom,sc8180x";
+};
+
+&gpu_zap_shader {
+	firmware-name = "qcom/sc8180x/microsoft/cambria/qcdxkmsuc8180.mbn";
+};
+
+&remoteproc_adsp {
+	firmware-name = "qcom/sc8180x/microsoft/cambria/qcadsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	firmware-name = "qcom/sc8180x/microsoft/cambria/qccdsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_mpss {
+	firmware-name = "qcom/sc8180x/microsoft/cambria/qcmpss8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_slpi {
+	firmware-name = "qcom/sc8180x/microsoft/cambria/qcslpi8180.mbn";
+
+	status = "okay";
+};

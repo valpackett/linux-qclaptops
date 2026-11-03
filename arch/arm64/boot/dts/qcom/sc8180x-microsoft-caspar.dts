@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+/dts-v1/;
+
+#include "sc8180x-microsoft-surface-pro-x.dtsi"
+
+/ {
+	model = "Microsoft Surface Pro X (Wi-Fi)";
+	compatible = "microsoft,caspar", "qcom,sc8180x";
+};
+
+&gpu_zap_shader {
+	firmware-name = "qcom/sc8180x/microsoft/caspar/qcdxkmsuc8180.mbn";
+};
+
+&remoteproc_adsp {
+	firmware-name = "qcom/sc8180x/microsoft/caspar/qcadsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	firmware-name = "qcom/sc8180x/microsoft/caspar/qccdsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_mpss {
+	firmware-name = "qcom/sc8180x/microsoft/caspar/qcmpss8180_nm.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_slpi {
+	firmware-name = "qcom/sc8180x/microsoft/caspar/qcslpi8180.mbn";
+
+	status = "okay";
+};

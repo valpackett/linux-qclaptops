@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: BSD-3-Clause
+
+/dts-v1/;
+
+#include "sc8180x-microsoft-surface-pro-x.dtsi"
+
+/ {
+	model = "Microsoft Surface Pro X (SQ2)";
+	compatible = "microsoft,carina", "qcom,sc8180x";
+};
+
+&cpu4_opp_table {
+	opp-3072000000 {
+		opp-hz = /bits/ 64 <3072000000>;
+		opp-peak-kBps = <8368000 51609600>;
+	};
+
+	opp-3148800000 {
+		opp-hz = /bits/ 64 <3148800000>;
+		opp-peak-kBps = <8368000 51609600>;
+	};
+};
+
+&gpu_zap_shader {
+	firmware-name = "qcom/sc8180x/microsoft/carina/qcdxkmsuc8180.mbn";
+};
+
+&remoteproc_adsp {
+	firmware-name = "qcom/sc8180x/microsoft/carina/qcadsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	firmware-name = "qcom/sc8180x/microsoft/carina/qccdsp8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_mpss {
+	firmware-name = "qcom/sc8180x/microsoft/carina/qcmpss8180.mbn";
+
+	status = "okay";
+};
+
+&remoteproc_slpi {
+	firmware-name = "qcom/sc8180x/microsoft/carina/qcslpi8180.mbn";
+
+	status = "okay";
+};
