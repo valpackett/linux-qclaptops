@@ -925,7 +925,9 @@ properties:
       - items:
           - enum:
               - lenovo,flex-5g
-              - microsoft,surface-prox
+              - microsoft,cambria
+              - microsoft,carina
+              - microsoft,caspar
               - qcom,sc8180x-primus
           - const: qcom,sc8180x
 
