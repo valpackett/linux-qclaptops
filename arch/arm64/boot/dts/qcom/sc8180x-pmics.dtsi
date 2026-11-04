@@ -157,7 +157,7 @@
 		#size-cells = <0>;
 	};
 
-	pmic@2 {
+	smb2351_2: pmic@2 {
 		compatible = "qcom,smb2351", "qcom,spmi-pmic";
 		reg = <0x2 SPMI_USID>;
 		#address-cells = <1>;
@@ -215,7 +215,7 @@
 		};
 	};
 
-	pmic@a {
+	smb2351_a: pmic@a {
 		compatible = "qcom,smb2351", "qcom,spmi-pmic";
 		reg = <0xa SPMI_USID>;
 		#address-cells = <1>;
