@@ -132,7 +132,7 @@
 			status = "disabled";
 		};
 
-		rtc@6000 {
+		pmc8180_rtc: rtc@6000 {
 			compatible = "qcom,pm8941-rtc";
 			reg = <0x6000>;
 			reg-names = "rtc", "alarm";
@@ -150,14 +150,14 @@
 		};
 	};
 
-	pmic@1 {
+	pmc8180_1: pmic@1 {
 		compatible = "qcom,pmc8180", "qcom,spmi-pmic";
 		reg = <0x1 SPMI_USID>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 	};
 
-	pmic@2 {
+	smb2351_0: pmic@2 {
 		compatible = "qcom,smb2351", "qcom,spmi-pmic";
 		reg = <0x2 SPMI_USID>;
 		#address-cells = <1>;
@@ -215,7 +215,7 @@
 		};
 	};
 
-	pmic@a {
+	smb2351_1: pmic@a {
 		compatible = "qcom,smb2351", "qcom,spmi-pmic";
 		reg = <0xa SPMI_USID>;
 		#address-cells = <1>;
