@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+/*
+ * Copyright (c) 2026, Val Packett <val@packett.cool>
+ */
+
+#include "sm6115.dtsi"
+#include "sm6115-motorola-common.dtsi"
+
+&framebuffer0 {
+	height = <1640>;
+};
+
+&gpu_zap_shader {
+	firmware-name = "qcom/sm6115/Motorola/cebu/a610_zap.mbn";
+};
+
+&i2c1 {
+	/* awinic,aw99703 backlight @ 36 */
+};
+
+&remoteproc_adsp {
+	firmware-name = "qcom/sm6115/Motorola/cebu/adsp.mbn";
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	firmware-name = "qcom/sm6115/Motorola/cebu/cdsp.mbn";
+	status = "okay";
+};
+
+&remoteproc_mpss {
+	firmware-name = "qcom/sm6115/Motorola/cebu/modem.mbn";
+	status = "okay";
+};
+
+&venus {
+	firmware-name = "qcom/sm6115/Motorola/cebu/venus.mbn";
+	status = "okay";
+};
+
+&wifi {
+	qcom,calibration-variant = "Motorola_cebu";
+};
