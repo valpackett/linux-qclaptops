@@ -12,7 +12,27 @@
 	compatible = "motorola,cebu-tianma", "motorola,cebu", "qcom,sm6115";
 };
 
-&dispcc {
-	/* Preserve the bootloader display until the native panel is supported */
-	status = "disabled";
+&panel {
+	compatible = "tianma,nt36525b-cebu", "novatek,nt36525b";
+
+	/* Do not use reset-gpios, black screen otherwise.
+	 * Downstream uses qcom,platform-reset-gpio-always-on */
+
+	vddi-supply = <&pm6125_l9a>;
+
+	status = "okay";
+};
+
+&pmi632_lcdb {
+	status = "okay";
+};
+
+&pmi632_lcdb_ldo {
+	regulator-min-microvolt = <6000000>;
+	regulator-max-microvolt = <6000000>;
+};
+
+&pmi632_lcdb_ncp {
+	regulator-min-microvolt = <6000000>;
+	regulator-max-microvolt = <6000000>;
 };
