@@ -25,6 +25,13 @@
 		wifi0 = &wifi;
 	};
 
+	battery: battery {
+		compatible = "simple-battery";
+
+		/* XXX: Conservative value, downstream qcom,fastchg-current-ma is 3A */
+		constant-charge-current-max-microamp = <1500000>;
+	};
+
 	chosen {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -140,6 +147,22 @@
 		bias-pull-up;
 		input-enable;
 	};
+};
+
+&pmi632_charger {
+	monitored-battery = <&battery>;
+
+	status = "okay";
+};
+
+&pmi632_qgauge {
+	monitored-battery = <&battery>;
+	power-supplies = <&pmi632_charger>;
+
+	io-channels = <&pmi632_adc ADC5_BAT_THERM_100K_PU>;
+	io-channel-names = "batt-therm";
+
+	status = "okay";
 };
 
 &pmi632_lpg {
