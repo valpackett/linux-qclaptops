@@ -274,7 +274,7 @@ static int nvt_ts_spi_upload_firmware(const struct nvt_ts_data *data,
 
 	ret = regmap_read_poll_timeout(
 		data->regmap, mem_map->event_buffer | NVT_TS_RESET_STATUS_START,
-		status, status == 0xa0, 10000, 100000);
+		status, status >= 0xa0 && status <= 0xaf, 10000, 100000);
 	if (ret) {
 		dev_err(dev, "firmware failed to boot, status: 0x%02x\n",
 			status);
