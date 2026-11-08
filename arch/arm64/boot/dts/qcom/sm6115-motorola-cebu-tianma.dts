@@ -17,6 +17,7 @@
 
 	/* Do not use reset-gpios, black screen otherwise.
 	 * Downstream uses qcom,platform-reset-gpio-always-on */
+	backlight = <&aw99703>;
 
 	vddi-supply = <&pm6125_l9a>;
 
