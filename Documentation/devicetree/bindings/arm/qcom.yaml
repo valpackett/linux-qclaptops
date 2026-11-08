@@ -1116,6 +1116,12 @@ properties:
 
       - items:
           - enum:
+              - motorola,guamp-holitech
+          - const: motorola,guamp
+          - const: qcom,sm6115
+
+      - items:
+          - enum:
               - lenovo,j606f
           - const: qcom,sm6115p
           - const: qcom,sm6115
