@@ -410,14 +410,28 @@ static const struct nvt_ts_chip_data nvt_nt36672a_ts_data = {
 	.chip_id = 0x00,
 };
 
+static const struct nvt_ts_memory_map nvt_nt36525b_memory_map = {
+	.event_buffer = 0x11a00,
+	.software_reset_n8 = 0x3f0fe,
+	.spi_rd_fast = 0x3f310,
+	.boot_ready = 0x1f141,
+};
+
+static const struct nvt_ts_chip_data nvt_nt36525b_ts_data = {
+	.memory_map = &nvt_nt36525b_memory_map,
+	.chip_id = 0x00,
+};
+
 static const struct of_device_id nvt_ts_spi_of_match[] = {
 	{ .compatible = "novatek,nt36672a-ts", .data = &nvt_nt36672a_ts_data },
+	{ .compatible = "novatek,nt36525b-ts", .data = &nvt_nt36525b_ts_data },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, nvt_ts_spi_of_match);
 
 static const struct spi_device_id nvt_ts_spi_id[] = {
 	{ "nt36672a-ts", (kernel_ulong_t)&nvt_nt36672a_ts_data },
+	{ "nt36525b-ts", (kernel_ulong_t)&nvt_nt36525b_ts_data },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(spi, nvt_ts_spi_id);
