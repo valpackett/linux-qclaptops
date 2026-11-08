@@ -37,3 +37,69 @@
 	regulator-min-microvolt = <6000000>;
 	regulator-max-microvolt = <6000000>;
 };
+
+&qup_spi0_default {
+	drive-strength = <8>;
+	/delete-property/ bias-pull-up;
+	bias-disable;
+};
+
+&spi0 {
+	status = "okay";
+
+	touchscreen: touchscreen@0 {
+		compatible = "novatek,nt36525b-ts";
+		reg = <0>;
+
+		spi-max-frequency = <9600000>;
+		spi-cpha;
+
+		interrupts-extended = <&tlmm 67 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&tlmm 66 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&ts_int_default &ts_reset_default>;
+		pinctrl-1 = <&ts_int_sleep &ts_reset_sleep>;
+		pinctrl-names = "default", "sleep";
+
+		vcc-supply = <&pmi632_lcdb_ldo>;
+		iovcc-supply = <&pm6125_l9a>;
+		panel = <&panel>;
+
+		firmware-name = "qcom/sm6115/Motorola/cebu/novatek_ts_fw.bin";
+
+		touchscreen-size-x = <720>;
+		touchscreen-size-y = <1640>;
+
+		status = "okay";
+	};
+};
+
+&tlmm {
+	ts_reset_default: ts-reset-default-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	ts_reset_sleep: ts-reset-sleep-state {
+		pins = "gpio66";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	ts_int_default: ts-int-default-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	ts_int_sleep: ts-int-sleep-state {
+		pins = "gpio67";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+};
