@@ -15,7 +15,19 @@
 };
 
 &i2c1 {
-	/* awinic,aw99703 backlight @ 36 */
+	status = "okay";
+
+	aw99703: backlight@36 {
+		compatible = "awinic,aw99703";
+		reg = <0x36>;
+
+		enable-gpios = <&pmi632_gpios 6 GPIO_ACTIVE_HIGH>;
+
+		awinic,led-strings = <3>;
+		awinic,iled-max-microamp = <25000>;
+		awinic,ocp-microamp = <3400000>;
+		awinic,inductor-nanohenry = <10000>;
+	};
 };
 
 &remoteproc_adsp {
