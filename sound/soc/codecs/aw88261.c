@@ -17,6 +17,7 @@
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
 #include <sound/tlv.h>
+#include "aw88258.h"
 #include "aw88261.h"
 #include "aw88395/aw88395_data_type.h"
 #include "aw88395/aw88395_device.h"
@@ -155,8 +156,20 @@ static int aw88261_dev_configure_syspll(struct aw88261 *aw88261)
 		return ret;
 
 	/* PLL divider must be used for 8/16/32 kHz modes */
-	ret = regmap_update_bits(aw_dev->regmap, AW88261_PLLCTRL1_REG,
-			~AW88261_CCO_MUX_MASK, aw88261->cco_mux_value);
+	switch (aw_dev->chip_id) {
+	case AW88261_CHIP_ID:
+		ret = regmap_update_bits(aw_dev->regmap, AW88261_PLLCTRL1_REG,
+				~AW88261_CCO_MUX_MASK, aw88261->cco_mux_divide ?
+				AW88261_CCO_MUX_DIVIDED_VALUE : AW88261_CCO_MUX_BYPASS_VALUE);
+		break;
+	case AW88258_CHIP_ID:
+		ret = regmap_update_bits(aw_dev->regmap, AW88258_PLLCTRL1_REG,
+				~AW88258_CCO_MUX_MASK, aw88261->cco_mux_divide ?
+				AW88258_CCO_MUX_DIVIDED_VALUE : AW88258_CCO_MUX_BYPASS_VALUE);
+		break;
+	default:
+		WARN_ONCE(1, "missing PLL regs for chip %x", aw_dev->chip_id);
+	}
 	if (ret)
 		return ret;
 
@@ -234,8 +247,9 @@ static void aw88261_dev_uls_hmute(struct aw_device *aw_dev, bool uls_hmute)
 
 static void aw88261_reg_force_set(struct aw88261 *aw88261)
 {
-	if (aw88261->frcset_en == AW88261_FRCSET_ENABLE) {
-		/* set FORCE_PWM */
+	if (aw88261->aw_pa->chip_id == AW88258_CHIP_ID) {
+		dev_dbg(aw88261->aw_pa->dev, "force_set not supported on aw88258");
+	} else if (aw88261->frcset_en == AW88261_FRCSET_ENABLE) {		/* set FORCE_PWM */
 		regmap_update_bits(aw88261->regmap, AW88261_BSTCTRL3_REG,
 				~AW88261_FORCE_PWM_MASK, AW88261_FORCE_PWM_FORCEMINUS_PWM_VALUE);
 		/* set BOOST_OS_WIDTH */
@@ -372,6 +386,8 @@ static int aw88261_dev_reg_update(struct aw88261 *aw88261,
 		reg_val = reg_data[i + 1];
 
 		if (reg_addr == AW88261_SYSCTRL_REG) {
+			dev_err(aw_dev->dev, "FW:SYSCTRL_REG:0x%x", reg_val);
+
 			aw88261->amppd_st = reg_val & (~AW88261_AMPPD_MASK);
 			ret = regmap_read(aw_dev->regmap, reg_addr, &read_val);
 			if (ret)
@@ -396,8 +412,19 @@ static int aw88261_dev_reg_update(struct aw88261 *aw88261,
 				aw88261->efuse_check = AW88261_EF_AND_CHECK;
 		}
 
+		if (reg_addr == AW88261_I2SCFG1_REG)
+			dev_err(aw_dev->dev, "FW:I2SCFG1_REG:0x%x", reg_val);
+
+		if (reg_addr == AW88261_I2SCTRL1_REG)
+			dev_err(aw_dev->dev, "FW:I2SCTRL1_REG:0x%x", reg_val);
+
+		if (reg_addr == AW88261_I2SCTRL2_REG)
+			dev_err(aw_dev->dev, "FW:I2SCTRL2_REG:0x%x", reg_val);
+
 		/* i2stxen */
 		if (reg_addr == AW88261_I2SCTRL3_REG) {
+			dev_err(aw_dev->dev, "FW:I2SCTRL3_REG:0x%x", reg_val);
+
 			/* close tx */
 			reg_val &= AW88261_I2STXEN_MASK;
 			reg_val |= AW88261_I2STXEN_DISABLE_VALUE;
@@ -703,11 +730,11 @@ static int aw88261_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		return 0;
 
-	aw88261->cco_mux_value = AW88261_CCO_MUX_BYPASS_VALUE;
+	aw88261->cco_mux_divide = false;
 	switch (params_rate(params)) {
 	case 8000:
 		aw88261->sr_value = AW88261_I2SSR_8KHZ_VALUE;
-		aw88261->cco_mux_value = AW88261_CCO_MUX_DIVIDED_VALUE;
+		aw88261->cco_mux_divide = true;
 		break;
 	case 11025:
 		aw88261->sr_value = AW88261_I2SSR_11P025KHZ_VALUE;
@@ -717,7 +744,7 @@ static int aw88261_hw_params(struct snd_pcm_substream *substream,
 		break;
 	case 16000:
 		aw88261->sr_value = AW88261_I2SSR_16KHZ_VALUE;
-		aw88261->cco_mux_value = AW88261_CCO_MUX_DIVIDED_VALUE;
+		aw88261->cco_mux_divide = true;
 		break;
 	case 22050:
 		aw88261->sr_value = AW88261_I2SSR_22P05KHZ_VALUE;
@@ -727,7 +754,7 @@ static int aw88261_hw_params(struct snd_pcm_substream *substream,
 		break;
 	case 32000:
 		aw88261->sr_value = AW88261_I2SSR_32KHZ_VALUE;
-		aw88261->cco_mux_value = AW88261_CCO_MUX_DIVIDED_VALUE;
+		aw88261->cco_mux_divide = true;
 		break;
 	case 44100:
 		aw88261->sr_value = AW88261_I2SSR_44P1KHZ_VALUE;
@@ -1284,7 +1311,7 @@ static int aw88261_init(struct aw88261 *aw88261, struct i2c_client *i2c, struct 
 		dev_err(&i2c->dev, "%s read chipid error. ret = %d", __func__, ret);
 		return ret;
 	}
-	if (chip_id != AW88261_CHIP_ID) {
+	if (chip_id != AW88261_CHIP_ID && chip_id != AW88258_CHIP_ID) {
 		dev_err(&i2c->dev, "unsupported device id = %x", chip_id);
 		return -ENXIO;
 	}
@@ -1299,7 +1326,7 @@ static int aw88261_init(struct aw88261 *aw88261, struct i2c_client *i2c, struct 
 	aw_dev->i2c = i2c;
 	aw_dev->regmap = regmap;
 	aw_dev->dev = &i2c->dev;
-	aw_dev->chip_id = AW88261_CHIP_ID;
+	aw_dev->chip_id = chip_id;
 	aw_dev->acf = NULL;
 	aw_dev->prof_info.prof_desc = NULL;
 	aw_dev->prof_info.count = 0;
@@ -1328,7 +1355,7 @@ static int aw88261_i2c_probe(struct i2c_client *i2c)
 	/* set defaults */
 	aw88261->slot_num_value = AW88261_SLOT_NUM_I2S_MODE_VALUE;
 	aw88261->sr_value = AW88261_I2SSR_48KHZ_VALUE;
-	aw88261->cco_mux_value = AW88261_CCO_MUX_BYPASS_VALUE;
+	aw88261->cco_mux_divide = false;
 	aw88261->fs_value = AW88261_I2SFS_24_BITS_VALUE;
 	aw88261->bck_value = AW88261_I2SBCK_64FS_VALUE;
 	aw88261->bck_inv_value = AW88261_BCKINV_NOT_INVERT_VALUE;
@@ -1362,12 +1389,14 @@ static int aw88261_i2c_probe(struct i2c_client *i2c)
 
 static const struct i2c_device_id aw88261_i2c_id[] = {
 	{ .name = "aw88261" },
+	{ .name = "aw88258" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, aw88261_i2c_id);
 
 static const struct of_device_id aw88261_of_table[] = {
 	{ .compatible = "awinic,aw88261" },
+	{ .compatible = "awinic,aw88258" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, aw88261_of_table);

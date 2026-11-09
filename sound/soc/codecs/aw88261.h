@@ -553,6 +553,7 @@
 
 enum aw88261_id {
 	AW88261_CHIP_ID = 0x2113,
+	AW88258_CHIP_ID = 0x1852,
 };
 
 enum {
@@ -594,7 +595,7 @@ struct aw88261 {
 	unsigned int amppd_st;
 
 	unsigned int sr_value;
-	unsigned int cco_mux_value;
+	bool cco_mux_divide;
 	unsigned int fs_value;
 	unsigned int bck_value;
 	unsigned int bck_inv_value;
