@@ -863,6 +863,10 @@ static int ov5693_set_fmt(struct v4l2_subdev *sd,
 	fmt = __ov5693_get_pad_format(ov5693, state, format->pad,
 				      format->which);
 
+	/* SPX WIP: no binning, see ov5693_enum_frame_size() */
+	hratio = 1;
+	vratio = 1;
+
 	fmt->width = crop->width / hratio;
 	fmt->height = crop->height / vratio;
 	fmt->code = MEDIA_BUS_FMT_SBGGR10_1X10;
@@ -1066,7 +1070,8 @@ static int ov5693_enum_frame_size(struct v4l2_subdev *sd,
 	struct ov5693_device *ov5693 = to_ov5693_sensor(sd);
 	struct v4l2_rect *__crop;
 
-	if (fse->index > 1 || fse->code != MEDIA_BUS_FMT_SBGGR10_1X10)
+	/* SPX WIP: binned (1/2) mode gives no frames through CAMSS yet; offer full size only */
+	if (fse->index > 0 || fse->code != MEDIA_BUS_FMT_SBGGR10_1X10)
 		return -EINVAL;
 
 	__crop = __ov5693_get_pad_crop(ov5693, state, fse->pad, fse->which);
