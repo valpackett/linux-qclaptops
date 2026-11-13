@@ -2244,6 +2244,7 @@ static int __maybe_unused qmp_usb_runtime_resume(struct device *dev)
 static const struct dev_pm_ops qmp_usb_pm_ops = {
 	SET_RUNTIME_PM_OPS(qmp_usb_runtime_suspend,
 			   qmp_usb_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 
 static int qmp_usb_reset_init(struct qmp_usb *qmp,
@@ -2627,7 +2628,7 @@ static struct platform_driver qmp_usb_driver = {
 	.probe		= qmp_usb_probe,
 	.driver = {
 		.name	= "qcom-qmp-usb-phy",
-		.pm	= &qmp_usb_pm_ops,
+		.pm	= pm_ptr(&qmp_usb_pm_ops),
 		.of_match_table = qmp_usb_of_match_table,
 	},
 };
