@@ -4738,6 +4738,8 @@ static int __maybe_unused qmp_combo_runtime_suspend(struct device *dev)
 
 	dev_vdbg(dev, "Suspending QMP phy, mode:%d\n", qmp->phy_mode);
 
+	guard(mutex)(&qmp->phy_mutex);
+
 	if (!qmp->init_count) {
 		dev_vdbg(dev, "PHY not initialized, bailing out\n");
 		return 0;
@@ -4757,6 +4759,8 @@ static int __maybe_unused qmp_combo_runtime_resume(struct device *dev)
 	int ret = 0;
 
 	dev_vdbg(dev, "Resuming QMP phy, mode:%d\n", qmp->phy_mode);
+
+	guard(mutex)(&qmp->phy_mutex);
 
 	if (!qmp->init_count) {
 		dev_vdbg(dev, "PHY not initialized, bailing out\n");
@@ -4782,6 +4786,7 @@ static int __maybe_unused qmp_combo_runtime_resume(struct device *dev)
 static const struct dev_pm_ops qmp_combo_pm_ops = {
 	SET_RUNTIME_PM_OPS(qmp_combo_runtime_suspend,
 			   qmp_combo_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 
 static int qmp_combo_reset_init(struct qmp_combo *qmp)
@@ -5790,7 +5795,7 @@ static struct platform_driver qmp_combo_driver = {
 	.probe		= qmp_combo_probe,
 	.driver = {
 		.name	= "qcom-qmp-combo-phy",
-		.pm	= &qmp_combo_pm_ops,
+		.pm	= pm_ptr(&qmp_combo_pm_ops),
 		.of_match_table = qmp_combo_of_match_table,
 	},
 };
