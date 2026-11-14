@@ -2443,6 +2443,20 @@ static const struct spmi_regulator_data pma8084_regulators[] = {
 	{ }
 };
 
+/*
+ * RPMh manages most of the PMC8180 regulators. On SC8180X, the command DB
+ * lists a few LDOs with their SPMI address instead of an RPMh address: RPMh
+ * does not serve requests for them, and the OS has to control them directly.
+ * Only those are listed here, so that this driver never touches a regulator
+ * that RPMh owns.
+ */
+static const struct spmi_regulator_data pmc8180_regulators[] = {
+	{ "l1", 0x4000, "vdd_l1_l8_l11", },
+	{ "l14", 0x4d00, "vdd_l7_l12_l14_l15", },
+	{ "l17", 0x5000, "vdd_l13_l16_l17", },
+	{ }
+};
+
 static const struct spmi_regulator_data pmi8994_regulators[] = {
 	{ "s1", 0x1400, "vdd_s1", },
 	{ "s2", 0x1700, "vdd_s2", },
@@ -2494,6 +2508,7 @@ static const struct of_device_id qcom_spmi_regulator_match[] = {
 	{ .compatible = "qcom,pm8950-regulators", .data = &pm8950_regulators },
 	{ .compatible = "qcom,pm8994-regulators", .data = &pm8994_regulators },
 	{ .compatible = "qcom,pma8084-regulators", .data = &pma8084_regulators },
+	{ .compatible = "qcom,pmc8180-regulators", .data = &pmc8180_regulators },
 	{ .compatible = "qcom,pmi8994-regulators", .data = &pmi8994_regulators },
 	{ .compatible = "qcom,pmp8074-regulators", .data = &pmp8074_regulators },
 	{ .compatible = "qcom,pms405-regulators", .data = &pms405_regulators },
