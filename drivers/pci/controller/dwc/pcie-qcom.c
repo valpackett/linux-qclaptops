@@ -339,6 +339,7 @@ struct qcom_pcie {
 	struct list_head ports;
 	struct gpio_desc *reset;
 	int global_irq;
+	bool no_hotplug;
 	bool use_pm_opp;
 	struct mutex reset_lock;
 };
@@ -411,6 +412,7 @@ static void qcom_pcie_clear_aspm_l0s(struct dw_pcie *pci)
 
 static void qcom_pcie_set_slot_cap(struct dw_pcie *pci)
 {
+	struct qcom_pcie *pcie = to_qcom_pcie(pci);
 	u8 offset = dw_pcie_get_pcie_cap(pci);
 	u32 val;
 
@@ -429,6 +431,18 @@ static void qcom_pcie_set_slot_cap(struct dw_pcie *pci)
 	 * Attention Button Present in Slot Capabilities.
 	 */
 	val &= ~PCI_EXP_SLTCAP_ABP;
+
+	/*
+	 * Hot-plug is only emulated through the link events of the "global"
+	 * interrupt. Without that interrupt the Root Port cannot report any
+	 * hot-plug event, so do not advertise the capability: a port that
+	 * claims it without a native hot-plug driver is kept in D0 by
+	 * pci_bridge_d3_possible(), which in turn keeps the host bridge out
+	 * of D3cold during system suspend.
+	 */
+	if (pcie->no_hotplug)
+		val &= ~PCI_EXP_SLTCAP_HPC;
+
 	writel(val, pci->dbi_base + offset + PCI_EXP_SLTCAP);
 
 	dw_pcie_dbi_ro_wr_dis(pci);
@@ -2470,6 +2484,8 @@ static int qcom_pcie_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, pcie);
+
+	pcie->no_hotplug = platform_get_irq_byname_optional(pdev, "global") <= 0;
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
