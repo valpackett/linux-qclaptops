@@ -27,6 +27,7 @@ properties:
       - qcom,pm8950-regulators
       - qcom,pm8994-regulators
       - qcom,pma8084-regulators
+      - qcom,pmc8180-regulators
       - qcom,pmi8994-regulators
       - qcom,pmp8074-regulators
       - qcom,pms405-regulators
@@ -379,6 +380,18 @@ allOf:
         vdd_5vs1-supply: true
       patternProperties:
         "^vdd_s([1-9]|1[0-2])-supply$": true
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,pmc8180-regulators
+    then:
+      properties:
+        vdd_l1_l8_l11-supply: true
+        vdd_l7_l12_l14_l15-supply: true
+        vdd_l13_l16_l17-supply: true
 
   - if:
       properties:
