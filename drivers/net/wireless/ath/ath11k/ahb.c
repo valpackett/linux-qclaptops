@@ -1340,10 +1340,72 @@ free_resources:
 	ath11k_ahb_free_resources(ab);
 }
 
+static __maybe_unused int ath11k_ahb_pm_suspend(struct device *dev)
+{
+	struct ath11k_base *ab = dev_get_drvdata(dev);
+	int ret;
+
+	if (test_bit(ATH11K_FLAG_QMI_FAIL, &ab->dev_flags))
+		return 0;
+
+	ret = ath11k_core_suspend(ab);
+	if (ret)
+		ath11k_warn(ab, "failed to suspend core: %d\n", ret);
+
+	return 0;
+}
+
+static __maybe_unused int ath11k_ahb_pm_resume(struct device *dev)
+{
+	struct ath11k_base *ab = dev_get_drvdata(dev);
+	int ret;
+
+	if (test_bit(ATH11K_FLAG_QMI_FAIL, &ab->dev_flags))
+		return 0;
+
+	ret = ath11k_core_resume(ab);
+	if (ret)
+		ath11k_warn(ab, "failed to resume core: %d\n", ret);
+
+	return ret;
+}
+
+static __maybe_unused int ath11k_ahb_pm_suspend_late(struct device *dev)
+{
+	struct ath11k_base *ab = dev_get_drvdata(dev);
+	int ret;
+
+	ret = ath11k_core_suspend_late(ab);
+	if (ret)
+		ath11k_warn(ab, "failed to late suspend core: %d\n", ret);
+
+	/* Allow system suspend/hibernation to survive a failed power down */
+	return 0;
+}
+
+static __maybe_unused int ath11k_ahb_pm_resume_early(struct device *dev)
+{
+	struct ath11k_base *ab = dev_get_drvdata(dev);
+	int ret;
+
+	ret = ath11k_core_resume_early(ab);
+	if (ret)
+		ath11k_warn(ab, "failed to early resume core: %d\n", ret);
+
+	return ret;
+}
+
+static const struct dev_pm_ops __maybe_unused ath11k_ahb_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(ath11k_ahb_pm_suspend, ath11k_ahb_pm_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(ath11k_ahb_pm_suspend_late,
+				     ath11k_ahb_pm_resume_early)
+};
+
 static struct platform_driver ath11k_ahb_driver = {
 	.driver = {
 		.name = "ath11k",
 		.of_match_table = ath11k_ahb_of_match,
+		.pm = pm_ptr(&ath11k_ahb_pm_ops),
 	},
 	.probe = ath11k_ahb_probe,
 	.remove = ath11k_ahb_remove,
