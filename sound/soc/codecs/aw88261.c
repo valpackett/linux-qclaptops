@@ -1006,7 +1006,8 @@ static int aw88261_volume_set(struct snd_kcontrol *kcontrol,
 
 	if (vol_desc->ctl_volume != value) {
 		vol_desc->ctl_volume = value;
-		aw88261_dev_set_volume(aw88261->aw_pa, vol_desc->ctl_volume);
+		if (aw88261->aw_pa->status == AW88261_DEV_PW_ON)
+			aw88261_dev_set_volume(aw88261->aw_pa, vol_desc->ctl_volume);
 
 		return 1;
 	}
@@ -1064,14 +1065,29 @@ static int aw88261_playback_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 	struct aw88261 *aw88261 = snd_soc_component_get_drvdata(component);
+	int ret;
 
 	guard(mutex)(&aw88261->lock);
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		if (!aw88261->dvdd_on) {
+			ret = regulator_enable(aw88261->dvdd);
+			if (ret)
+				return ret;
+			aw88261->dvdd_on = true;
+		}
 		aw88261_start(aw88261);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		/*
+		 * DAPM runs the power down sequence once at card bind time for the
+		 * widgets it assumes are on, so only balance our own enable here.
+		 */
+		if (!aw88261->dvdd_on)
+			break;
 		aw88261_dev_stop(aw88261->aw_pa);
+		regulator_disable(aw88261->dvdd);
+		aw88261->dvdd_on = false;
 		break;
 	default:
 		break;
@@ -1229,7 +1245,15 @@ static int aw88261_codec_probe(struct snd_soc_component *component)
 	struct aw88261 *aw88261 = snd_soc_component_get_drvdata(component);
 	int ret;
 
+	/* Talking to the chip needs dvdd, the rest below is DAPM bookkeeping */
+	ret = regulator_enable(aw88261->dvdd);
+	if (ret)
+		return ret;
+
 	ret = aw88261_request_firmware_file(aw88261);
+
+	regulator_disable(aw88261->dvdd);
+
 	if (ret)
 		return dev_err_probe(aw88261->aw_pa->dev, ret,
 				"aw88261_request_firmware_file failed\n");
@@ -1274,12 +1298,18 @@ static int aw88261_init(struct aw88261 *aw88261, struct i2c_client *i2c, struct 
 	unsigned int chip_id;
 	int ret;
 
-	ret = devm_regulator_get_enable(&i2c->dev, "dvdd");
+	aw88261->dvdd = devm_regulator_get(&i2c->dev, "dvdd");
+	if (IS_ERR(aw88261->dvdd))
+		return dev_err_probe(&i2c->dev, PTR_ERR(aw88261->dvdd),
+				     "Failed to get dvdd supply\n");
+
+	ret = regulator_enable(aw88261->dvdd);
 	if (ret)
 		return dev_err_probe(&i2c->dev, ret, "Failed to enable dvdd supply\n");
 
 	/* read chip id */
 	ret = regmap_read(regmap, AW88261_ID_REG, &chip_id);
+	regulator_disable(aw88261->dvdd);
 	if (ret) {
 		dev_err(&i2c->dev, "%s read chipid error. ret = %d", __func__, ret);
 		return ret;

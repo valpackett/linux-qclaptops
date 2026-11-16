@@ -581,10 +581,14 @@ enum {
 	AW88261_FRCSET_ENABLE,
 };
 
+struct regulator;
+
 struct aw88261 {
 	struct aw_device *aw_pa;
 	struct mutex lock;
 	struct gpio_desc *reset_gpio;
+	struct regulator *dvdd;
+	bool dvdd_on;
 	struct regmap *regmap;
 	struct aw_container *aw_cfg;
 
