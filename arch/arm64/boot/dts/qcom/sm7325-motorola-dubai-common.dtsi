@@ -1102,6 +1102,29 @@
 	};
 };
 
+&i2c9 {
+	clock-frequency = <400000>;
+
+	status = "okay";
+
+	nfc@8 {
+		compatible = "st,st21nfcj", "st,st21nfcd";
+		reg = <0x8>;
+
+		interrupts-extended = <&tlmm 41 IRQ_TYPE_LEVEL_HIGH>;
+		reset-gpios = <&tlmm 38 GPIO_ACTIVE_LOW>;
+
+		pinctrl-0 = <&nfc_enable_default>, <&nfc_clkreq_default>, <&nfc_se_spi_reset_default>, <&nfc_int_default>;
+		pinctrl-names = "default";
+
+		clocks = <&rpmhcc RPMH_LN_BB_CLK2>;
+		vdd-io-supply = <&vreg_l18b_1p8>;
+
+		ese-present;
+		uicc-present;
+	};
+};
+
 &ipa {
 	firmware-name = "qcom/sm7325/motorola/dubai/yupik_ipa_fws.mbn";
 	memory-region = <&ipa_fw_mem>;
@@ -1500,6 +1523,11 @@
 };
 
 &qup_i2c1_data_clk {
+	drive-strength = <2>;
+	bias-pull-up;
+};
+
+&qup_i2c9_data_clk {
 	drive-strength = <2>;
 	bias-pull-up;
 };
@@ -2018,6 +2046,34 @@
 		 * is floating which may cause spurious wakeups.
 		 */
 		bias-pull-up;
+	};
+
+	nfc_enable_default: nfc-enable-default-state {
+		pins = "gpio38";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	nfc_clkreq_default: nfc-clkreq-default-state {
+		pins = "gpio39";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	nfc_se_spi_reset_default: nfc-se-spi-reset-default-state {
+		pins = "gpio40";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	nfc_int_default: nfc-int-default-state {
+		pins = "gpio41";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
 	};
 
 	oled_reset_n: oled-reset-n-state {
