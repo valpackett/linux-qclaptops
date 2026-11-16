@@ -1365,6 +1365,7 @@ static struct qcom_icc_bcm bcm_sh0 = {
 
 static struct qcom_icc_bcm bcm_mm0 = {
 	.name = "MM0",
+	.keepalive = true,
 	.num_nodes = 1,
 	.nodes = { &slv_qns_mem_noc_hf }
 };
