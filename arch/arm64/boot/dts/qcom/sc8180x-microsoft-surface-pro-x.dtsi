@@ -13,6 +13,8 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/leds/common.h>
+#include <dt-bindings/media/video-interface-devices.h>
+#include <dt-bindings/media/video-interfaces.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
 #include <dt-bindings/spmi/spmi.h>
 #include "sc8180x.dtsi"
@@ -399,6 +401,116 @@
 	};
 };
 
+&camss {
+	vdda-phy-supply = <&vreg_l5e_0p88>;
+	vdda-pll-supply = <&vreg_l3c_1p2>;
+	status = "okay";
+
+	ports {
+		port@0 {
+			csiphy0_lanes01_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1>;
+				remote-endpoint = <&ov5693_ep>;
+			};
+		};
+
+		port@3 {
+			csiphy3_lane0_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0>;
+				remote-endpoint = <&ov7251_ep>;
+			};
+		};
+	};
+};
+
+&cci0 {
+	status = "okay";
+};
+
+&cci0_i2c0 {
+	// unknown@0c
+	// unknown@50
+	sensor@60 {
+		compatible = "ovti,ov7251";
+		reg = <0x60>;
+
+		vdda-supply = <&vreg_l14a_1p8>;
+		vddd-supply = <&vreg_l14a_1p8>;
+		vdddo-supply = <&vreg_l14a_1p8>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&cam_mclk3_active &cam_ir_active>;
+		pinctrl-1 = <&cam_mclk3_suspend &cam_ir_suspend>;
+
+		clocks = <&camcc CAM_CC_MCLK3_CLK>;
+		clock-names = "xclk";
+		assigned-clocks = <&camcc CAM_CC_MCLK3_CLK>;
+		assigned-clock-rates = <19200000>;
+
+		/* CAM_IR_PWRDN_N; driver's confused and treats reset as pwrdn */
+		enable-gpios = <&tlmm 23 GPIO_ACTIVE_HIGH>;
+
+		orientation = <MEDIA_ORIENTATION_FRONT>;
+
+		port {
+			ov7251_ep: endpoint {
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				data-lanes = <1>;
+				link-frequencies = /bits/ 64 <240000000 319200000>;
+				remote-endpoint = <&csiphy3_lane0_ep>;
+			};
+		};
+	};
+};
+
+&cci0_i2c1 {
+	sensor@36 {
+		compatible = "ovti,ov5693";
+		reg = <0x36>;
+
+		// LDO makes avdd2.8V, enabled also by l14a itself(!)
+		avdd-supply = <&vreg_l14a_1p8>;
+		dvdd-supply = <&vreg_l14a_1p8>;
+		dovdd-supply = <&vreg_l14a_1p8>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&cam_mclk2_active &cam_front_active>;
+		pinctrl-1 = <&cam_mclk2_suspend &cam_front_suspend>;
+
+		/* CAM_FRONT_PWRDN_N; driver's confused and treats reset as pwrdn */
+		reset-gpios = <&tlmm 12 GPIO_ACTIVE_LOW>;
+
+		clocks = <&camcc CAM_CC_MCLK2_CLK>;
+		clock-names = "xvclk";
+		assigned-clocks = <&camcc CAM_CC_MCLK2_CLK>;
+		assigned-clock-rates = <19200000>;
+
+		orientation = <MEDIA_ORIENTATION_FRONT>;
+		rotation = <180>;
+
+		leds = <&privacy_led>;
+		led-names = "privacy";
+
+		port {
+			ov5693_ep: endpoint {
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				data-lanes = <1 2>;
+				link-frequencies = /bits/ 64 <419200000>;
+				remote-endpoint = <&csiphy0_lanes01_ep>;
+			};
+		};
+	};
+
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		vcc-supply = <&vreg_l14a_1p8>;
+		read-only;
+	};
+};
+
 &dispcc {
 	status = "okay";
 };
@@ -516,6 +628,23 @@
 &pcie2_port0 {
 	reset-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
 	wake-gpios = <&tlmm 104 GPIO_ACTIVE_LOW>;
+};
+
+&pmc8180_1 {
+	regulators {
+		compatible = "qcom,pmc8180-regulators";
+
+		vdd_l1_l8_l11-supply = <&vreg_s6c_1p37>;
+		vdd_l7_l12_l14_l15-supply = <&vreg_s5a_2p04>;
+		vdd_l13_l16_l17-supply = <&vreg_bob>;
+
+		vreg_l14a_1p8: l14 {
+			regulator-name = "vreg_l14a_1p8";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-enable-ramp-delay = <10000>;
+		};
+	};
 };
 
 &pmc8180_1_gpios {
@@ -704,6 +833,72 @@
 	edp_hpd_active: edp-hpd-active-state {
 		pins = "gpio10";
 		function = "edp_hot";
+	};
+
+	cam_front_active: cam-front-active-state {
+		pins = "gpio12";
+		function = "gpio";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_front_suspend: cam-front-suspend-state {
+		pins = "gpio12";
+		function = "gpio";
+
+		bias-pull-down;
+		drive-strength = <2>;
+		output-low;
+	};
+
+	cam_mclk2_active: cam_mclk2_active {
+		pins = "gpio15";
+		function = "cam_mclk";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_mclk2_suspend: cam_mclk2_suspend {
+		pins = "gpio15";
+		function = "cam_mclk";
+
+		bias-pull-down;
+		drive-strength = <2>;
+	};
+
+	cam_mclk3_active: cam_mclk3_active {
+		pins = "gpio16";
+		function = "cam_mclk";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_mclk3_suspend: cam_mclk3_suspend {
+		pins = "gpio16";
+		function = "cam_mclk";
+
+		bias-pull-down;
+		drive-strength = <2>;
+	};
+
+	cam_ir_active: cam-ir-active-state {
+		pins = "gpio23";
+		function = "gpio";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_ir_suspend: cam-ir-suspend-state {
+		pins = "gpio23";
+		function = "gpio";
+
+		bias-pull-down;
+		drive-strength = <2>;
+		output-low;
 	};
 
 	cam_indicator_active: cam-indicator-active-state {
