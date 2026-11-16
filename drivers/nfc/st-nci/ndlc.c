@@ -45,6 +45,12 @@ do {                                                             \
 
 int ndlc_open(struct llt_ndlc *ndlc)
 {
+	ndlc->hard_fault = 0;
+	ndlc->t1_active = false;
+	ndlc->t2_active = false;
+	timer_delete_sync(&ndlc->t1_timer);
+	timer_delete_sync(&ndlc->t2_timer);
+
 	/* toggle reset pin */
 	ndlc->ops->enable(ndlc->phy_id);
 	ndlc->powered = 1;
