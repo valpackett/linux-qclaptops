@@ -29,6 +29,7 @@
 
 #define ST_NCI_I2C_MIN_SIZE 4   /* PCB(1) + NCI Packet header(3) */
 #define ST_NCI_NCI_HDR_SIZE 3   /* raw NCI: MT/PBF/GID + OID + len */
+#define ST_NCI_IDLE_BYTE 0x7e
 #define ST_NCI_I2C_MAX_SIZE 250 /* req 4.2.1 */
 
 enum st_nci_i2c_proto {
@@ -134,6 +135,8 @@ static int st_nci_i2c_read(struct st_nci_i2c_phy *phy,
 	struct i2c_client *client = phy->i2c_dev;
 
 	if (phy->raw_nci) {
+		int idle;
+
 		r = i2c_master_recv(client, buf, ST_NCI_NCI_HDR_SIZE);
 		if (r < 0) {
 			usleep_range(1000, 4000);
@@ -141,6 +144,21 @@ static int st_nci_i2c_read(struct st_nci_i2c_phy *phy,
 		}
 		if (r != ST_NCI_NCI_HDR_SIZE)
 			return -EREMOTEIO;
+
+		for (idle = 0; idle < ST_NCI_NCI_HDR_SIZE &&
+		     buf[idle] == ST_NCI_IDLE_BYTE; idle++)
+			;
+
+		if (idle == ST_NCI_NCI_HDR_SIZE)
+			return -ENODATA;
+
+		if (idle) {
+			memmove(buf, buf + idle, ST_NCI_NCI_HDR_SIZE - idle);
+			r = i2c_master_recv(client, buf + ST_NCI_NCI_HDR_SIZE - idle,
+					    idle);
+			if (r != idle)
+				return -EREMOTEIO;
+		}
 
 		len = buf[2];
 		if (len > ST_NCI_I2C_MAX_SIZE) {
@@ -232,7 +250,7 @@ static irqreturn_t st_nci_irq_thread_fn(int irq, void *phy_id)
 	}
 
 	r = st_nci_i2c_read(phy, &skb);
-	if (r == -EREMOTEIO || r == -ENOMEM || r == -EBADMSG)
+	if (r == -EREMOTEIO || r == -ENOMEM || r == -EBADMSG || r == -ENODATA)
 		return IRQ_HANDLED;
 
 	ndlc_recv(phy->ndlc, skb);
