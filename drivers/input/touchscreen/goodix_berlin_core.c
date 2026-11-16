@@ -30,11 +30,14 @@
 #include <linux/input/mt.h>
 #include <linux/input/touchscreen.h>
 #include <linux/interrupt.h>
+#include <linux/pm_runtime.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/sizes.h>
 #include <linux/unaligned.h>
+
+#include <drm/drm_panel.h>
 
 #include "goodix_berlin.h"
 
@@ -177,6 +180,11 @@ struct goodix_berlin_core {
 	u32 touch_data_addr;
 
 	const struct goodix_berlin_ic_data *ic_data;
+
+	struct drm_panel_follower panel_follower;
+
+	/* Set if the device was powered on when entering system sleep */
+	bool resume_after_system_sleep;
 
 	struct goodix_berlin_event event;
 };
@@ -603,6 +611,20 @@ out:
 	return IRQ_HANDLED;
 }
 
+static int goodix_berlin_input_open(struct input_dev *input_dev)
+{
+	struct goodix_berlin_core *cd = input_get_drvdata(input_dev);
+
+	return pm_runtime_resume_and_get(cd->dev);
+}
+
+static void goodix_berlin_input_close(struct input_dev *input_dev)
+{
+	struct goodix_berlin_core *cd = input_get_drvdata(input_dev);
+
+	pm_runtime_put(cd->dev);
+}
+
 static int goodix_berlin_input_dev_config(struct goodix_berlin_core *cd,
 					  const struct input_id *id)
 {
@@ -620,6 +642,12 @@ static int goodix_berlin_input_dev_config(struct goodix_berlin_core *cd,
 	input_dev->phys = "input/ts";
 
 	input_dev->id = *id;
+
+	/* Without the panel to manage our PM, rely on open/close */
+	if (!drm_is_panel_follower(cd->dev)) {
+		input_dev->open = goodix_berlin_input_open;
+		input_dev->close = goodix_berlin_input_close;
+	}
 
 	input_set_abs_params(cd->input_dev, ABS_MT_POSITION_X,
 			     0, SZ_64K - 1, 0, 0);
@@ -649,7 +677,7 @@ static int goodix_berlin_input_dev_config(struct goodix_berlin_core *cd,
 	return 0;
 }
 
-static int goodix_berlin_suspend(struct device *dev)
+static __maybe_unused int goodix_berlin_runtime_suspend(struct device *dev)
 {
 	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
 
@@ -659,7 +687,7 @@ static int goodix_berlin_suspend(struct device *dev)
 	return 0;
 }
 
-static int goodix_berlin_resume(struct device *dev)
+static __maybe_unused int goodix_berlin_runtime_resume(struct device *dev)
 {
 	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
 	int error;
@@ -673,14 +701,104 @@ static int goodix_berlin_resume(struct device *dev)
 	return 0;
 }
 
-EXPORT_GPL_SIMPLE_DEV_PM_OPS(goodix_berlin_pm_ops,
-			     goodix_berlin_suspend, goodix_berlin_resume);
+static __maybe_unused int goodix_berlin_suspend(struct device *dev)
+{
+	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
+
+	/*
+	 * Runtime PM is the single source of truth for the power state: if either
+	 * the panel or an opened input device holds a runtime reference we are
+	 * powered on and have to be brought down for system sleep.
+	 *
+	 * pm_runtime_force_suspend() cannot be used here, because its resume
+	 * counterpart skips devices with a usage count of 1 (which is always our
+	 * case) and would thus leave us powered off after system resume.
+	 */
+	if (pm_runtime_status_suspended(dev))
+		return 0;
+
+	cd->resume_after_system_sleep = true;
+
+	pm_runtime_disable(dev);
+	goodix_berlin_runtime_suspend(dev);
+	pm_runtime_set_suspended(dev);
+
+	return 0;
+}
+
+static __maybe_unused int goodix_berlin_resume(struct device *dev)
+{
+	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
+	int error;
+
+	if (!cd->resume_after_system_sleep)
+		return 0;
+
+	cd->resume_after_system_sleep = false;
+
+	error = goodix_berlin_runtime_resume(dev);
+	if (error) {
+		pm_runtime_set_suspended(dev);
+		pm_runtime_enable(dev);
+		return error;
+	}
+
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
+	return 0;
+}
+
+EXPORT_GPL_DEV_PM_OPS(goodix_berlin_pm_ops) = {
+	SYSTEM_SLEEP_PM_OPS(goodix_berlin_suspend, goodix_berlin_resume)
+	RUNTIME_PM_OPS(goodix_berlin_runtime_suspend,
+		       goodix_berlin_runtime_resume, NULL)
+};
+
+static int goodix_berlin_panel_prepared(struct drm_panel_follower *follower)
+{
+	struct goodix_berlin_core *cd =
+		container_of(follower, struct goodix_berlin_core, panel_follower);
+	int error;
+
+	error = pm_runtime_resume_and_get(cd->dev);
+	if (error)
+		dev_err(cd->dev, "failed to power on: %d\n", error);
+
+	return error;
+}
+
+static int goodix_berlin_panel_unpreparing(struct drm_panel_follower *follower)
+{
+	struct goodix_berlin_core *cd =
+		container_of(follower, struct goodix_berlin_core, panel_follower);
+
+	pm_runtime_put_sync(cd->dev);
+
+	return 0;
+}
+
+static const struct drm_panel_follower_funcs goodix_berlin_panel_follower_funcs = {
+	.panel_prepared = goodix_berlin_panel_prepared,
+	.panel_unpreparing = goodix_berlin_panel_unpreparing,
+};
 
 static void goodix_berlin_power_off_act(void *data)
 {
 	struct goodix_berlin_core *cd = data;
 
+	/* Rails are already off if the device was left runtime suspended */
+	if (pm_runtime_status_suspended(cd->dev))
+		return;
+
 	goodix_berlin_power_off(cd);
+}
+
+static void goodix_berlin_disable_runtime_pm(void *data)
+{
+	struct goodix_berlin_core *cd = data;
+
+	pm_runtime_disable(cd->dev);
 }
 
 static ssize_t registers_read(struct file *filp, struct kobject *kobj,
@@ -691,7 +809,13 @@ static ssize_t registers_read(struct file *filp, struct kobject *kobj,
 	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
 	int error;
 
+	error = pm_runtime_resume_and_get(dev);
+	if (error)
+		return error;
+
 	error = regmap_raw_read(cd->regmap, off, buf, count);
+
+	pm_runtime_put(dev);
 
 	return error ? error : count;
 }
@@ -704,7 +828,13 @@ static ssize_t registers_write(struct file *filp, struct kobject *kobj,
 	struct goodix_berlin_core *cd = dev_get_drvdata(dev);
 	int error;
 
+	error = pm_runtime_resume_and_get(dev);
+	if (error)
+		return error;
+
 	error = regmap_raw_write(cd->regmap, off, buf, count);
+
+	pm_runtime_put(dev);
 
 	return error ? error : count;
 }
@@ -747,6 +877,8 @@ int goodix_berlin_probe(struct device *dev, int irq, const struct input_id *id,
 	cd->irq = irq;
 	cd->ic_data = ic_data;
 
+	dev_set_drvdata(dev, cd);
+
 	cd->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(cd->reset_gpio))
 		return dev_err_probe(dev, PTR_ERR(cd->reset_gpio),
@@ -768,6 +900,8 @@ int goodix_berlin_probe(struct device *dev, int irq, const struct input_id *id,
 		return error;
 	}
 
+	pm_runtime_set_active(dev);
+
 	error = devm_add_action_or_reset(dev, goodix_berlin_power_off_act, cd);
 	if (error)
 		return error;
@@ -784,6 +918,13 @@ int goodix_berlin_probe(struct device *dev, int irq, const struct input_id *id,
 		return error;
 	}
 
+	pm_runtime_enable(dev);
+
+	error = devm_add_action_or_reset(dev, goodix_berlin_disable_runtime_pm,
+					cd);
+	if (error)
+		return error;
+
 	error = goodix_berlin_input_dev_config(cd, id);
 	if (error) {
 		dev_err(dev, "failed set input device");
@@ -797,7 +938,16 @@ int goodix_berlin_probe(struct device *dev, int irq, const struct input_id *id,
 		return error;
 	}
 
-	dev_set_drvdata(dev, cd);
+	if (drm_is_panel_follower(dev)) {
+		cd->panel_follower.funcs = &goodix_berlin_panel_follower_funcs;
+
+		error = devm_drm_panel_add_follower(dev, &cd->panel_follower);
+		if (error)
+			return dev_err_probe(dev, error,
+					     "failed to add panel follower\n");
+	}
+
+	pm_runtime_idle(dev);
 
 	dev_dbg(dev, "Goodix Berlin %s Touchscreen Controller",
 		cd->fw_version.patch_pid);
