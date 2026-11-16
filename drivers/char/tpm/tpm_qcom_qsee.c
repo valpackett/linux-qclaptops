@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -391,8 +392,13 @@ static int qcom_tpm_qsee_probe(struct auxiliary_device *aux_dev,
 		return PTR_ERR(qtpm->mempool);
 
 	ret = qcom_scm_query_tpm_type(&tpm_type);
-	if (ret)
-		return dev_err_probe(dev, ret, "failed to query TPM type\n");
+	if (ret) {
+		/* SC8180X doesn't support the type query */
+		if (of_machine_is_compatible("qcom,sc8180x"))
+			tpm_type = QCOM_TPM_TYPE_FTPM;
+		else
+			return dev_err_probe(dev, ret, "failed to query TPM type\n");
+	}
 
 	if (tpm_type != QCOM_TPM_TYPE_FTPM && tpm_type != QCOM_TPM_TYPE_DTPM) {
 		dev_err(dev, "unsupported TPM type %#llx (%s)\n",
