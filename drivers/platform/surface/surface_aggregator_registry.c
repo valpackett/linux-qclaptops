@@ -227,6 +227,12 @@ static const struct software_node ssam_node_pos_tablet_switch = {
 	.parent = &ssam_node_root,
 };
 
+/* USB Type-C ports. */
+static const struct software_node ssam_node_typec = {
+	.name = "ssam:01:1b:01:01:00",
+	.parent = &ssam_node_root,
+};
+
 /*
  * Devices for 5th- and 6th-generations models:
  * - Surface Book 2,
@@ -366,6 +372,7 @@ static const struct software_node *ssam_node_group_spx[] = {
 	&ssam_node_bat_ac,
 	&ssam_node_bat_main,
 	&ssam_node_tmp_sensors,
+	&ssam_node_typec,
 	&ssam_node_kip_tablet_switch,
 	&ssam_node_hid_kip_keyboard,
 	&ssam_node_hid_kip_penstash,
