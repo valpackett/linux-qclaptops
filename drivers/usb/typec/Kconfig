@@ -100,6 +100,19 @@ config TYPEC_STUSB160X
 	  If you choose to build this driver as a dynamically linked module, the
 	  module will be called stusb160x.ko.
 
+config TYPEC_SURFACE
+	tristate "Microsoft Surface Type-C controller driver"
+	depends on USB_ROLE_SWITCH
+	depends on SURFACE_AGGREGATOR
+	depends on SURFACE_AGGREGATOR_BUS
+	help
+	  Say Y or M here if your system has the Type-C controller in the
+	  Surface Aggregator Module (embedded controller), such as on the
+	  Microsoft Surface Pro X tablet.
+
+	  If you choose to build this driver as a dynamically linked module, the
+	  module will be called surface_typec.ko.
+
 config TYPEC_WUSB3801
 	tristate "Willsemi WUSB3801 Type-C port controller driver"
 	depends on I2C

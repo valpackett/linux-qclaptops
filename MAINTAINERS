@@ -18757,6 +18757,13 @@ L:	linux-arm-msm@vger.kernel.org
 S:	Maintained
 F:	drivers/rtc/rtc-surface.c
 
+MICROSOFT SURFACE PRO X USB TYPE-C CONTROLLER DRIVER
+M:	Val Packett <val@packett.cool>
+L:	linux-usb@vger.kernel.org
+L:	linux-arm-msm@vger.kernel.org
+S:	Maintained
+F:	drivers/usb/typec/surface_typec.c
+
 MICROSOFT SURFACE SYSTEM AGGREGATOR HUB DRIVER
 M:	Maximilian Luz <luzmaximilian@gmail.com>
 L:	platform-driver-x86@vger.kernel.org
