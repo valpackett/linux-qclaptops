@@ -80,6 +80,8 @@ struct wcd937x_priv {
 	struct device_node *rxnode;
 	struct device_node *txnode;
 	struct regmap *regmap;
+	struct regulator_bulk_data *supplies;
+	bool supplies_on;
 	/* micb setup lock */
 	struct mutex micb_lock;
 	/* mbhc module */
@@ -109,8 +111,55 @@ struct wcd937x_priv {
 	atomic_t ana_clk_count;
 };
 
-static const char * const wcd937x_supplies[] = {
-	"vdd-rxtx", "vdd-px", "vdd-mic-bias", "vdd-buck",
+static const struct regulator_bulk_data wcd937x_supplies[] = {
+	{ .supply = "vdd-rxtx" },
+	{ .supply = "vdd-px" },
+	{ .supply = "vdd-mic-bias" },
+	{ .supply = "vdd-buck" },
+};
+
+/*
+ * Supplies are shared between the runtime PM callbacks and the DAPM bias
+ * level, so keep the state here instead of relying on the regulator
+ * refcount (runtime PM is pinned for as long as a PCM is open).
+ */
+static int wcd937x_enable_supplies(struct wcd937x_priv *wcd937x, bool enable)
+{
+	int ret;
+
+	if (wcd937x->supplies_on == enable)
+		return 0;
+
+	if (enable)
+		ret = regulator_bulk_enable(ARRAY_SIZE(wcd937x_supplies),
+					    wcd937x->supplies);
+	else
+		ret = regulator_bulk_disable(ARRAY_SIZE(wcd937x_supplies),
+					     wcd937x->supplies);
+	if (ret)
+		return ret;
+
+	wcd937x->supplies_on = enable;
+
+	return 0;
+}
+
+static int wcd937x_runtime_suspend(struct device *dev)
+{
+	struct wcd937x_priv *wcd937x = dev_get_drvdata(dev);
+
+	return wcd937x_enable_supplies(wcd937x, false);
+}
+
+static int wcd937x_runtime_resume(struct device *dev)
+{
+	struct wcd937x_priv *wcd937x = dev_get_drvdata(dev);
+
+	return wcd937x_enable_supplies(wcd937x, true);
+}
+
+static const struct dev_pm_ops wcd937x_pm_ops = {
+	RUNTIME_PM_OPS(wcd937x_runtime_suspend, wcd937x_runtime_resume, NULL)
 };
 
 static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(ear_pa_gain, 600, -1800);
@@ -2620,6 +2669,23 @@ static int wcd937x_codec_set_jack(struct snd_soc_component *comp,
 	return ret;
 }
 
+static int wcd937x_set_bias_level(struct snd_soc_component *component,
+				  enum snd_soc_bias_level level)
+{
+	struct wcd937x_priv *wcd937x = snd_soc_component_get_drvdata(component);
+
+	switch (level) {
+	case SND_SOC_BIAS_ON:
+	case SND_SOC_BIAS_PREPARE:
+	case SND_SOC_BIAS_STANDBY:
+		return wcd937x_enable_supplies(wcd937x, true);
+	case SND_SOC_BIAS_OFF:
+		return wcd937x_enable_supplies(wcd937x, false);
+	}
+
+	return 0;
+}
+
 static const struct snd_soc_component_driver soc_codec_dev_wcd937x = {
 	.name = "wcd937x_codec",
 	.probe = wcd937x_soc_codec_probe,
@@ -2631,6 +2697,11 @@ static const struct snd_soc_component_driver soc_codec_dev_wcd937x = {
 	.dapm_routes = wcd937x_audio_map,
 	.num_dapm_routes = ARRAY_SIZE(wcd937x_audio_map),
 	.set_jack = wcd937x_codec_set_jack,
+	/*
+	 * idle_bias_on is left unset, so DAPM drives the bias down to
+	 * SND_SOC_BIAS_OFF whenever the codec graph is idle.
+	 */
+	.set_bias_level = wcd937x_set_bias_level,
 	.endianness = 1,
 };
 
@@ -2931,10 +3002,10 @@ static int wcd937x_probe(struct platform_device *pdev)
 	cfg = &wcd937x->mbhc_cfg;
 	cfg->swap_gnd_mic = wcd937x_swap_gnd_mic;
 
-	ret = devm_regulator_bulk_get_enable(dev, ARRAY_SIZE(wcd937x_supplies),
-					     wcd937x_supplies);
+	ret = devm_regulator_bulk_get_const(dev, ARRAY_SIZE(wcd937x_supplies),
+					    wcd937x_supplies, &wcd937x->supplies);
 	if (ret)
-		return dev_err_probe(dev, ret, "Failed to get and enable supplies\n");
+		return dev_err_probe(dev, ret, "Failed to get supplies\n");
 
 	ret = wcd_dt_parse_micbias_info(&wcd937x->common);
 	if (ret)
@@ -2952,6 +3023,10 @@ static int wcd937x_probe(struct platform_device *pdev)
 	wcd_dt_parse_mbhc_data(dev, &wcd937x->mbhc_cfg);
 
 	ret = wcd937x_add_slave_components(wcd937x, dev, &match);
+	if (ret)
+		return ret;
+
+	ret = wcd937x_enable_supplies(wcd937x, true);
 	if (ret)
 		return ret;
 
@@ -2974,12 +3049,15 @@ static int wcd937x_probe(struct platform_device *pdev)
 static void wcd937x_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct wcd937x_priv *wcd937x = dev_get_drvdata(dev);
 
 	component_master_del(&pdev->dev, &wcd937x_comp_ops);
 
 	pm_runtime_disable(dev);
 	pm_runtime_set_suspended(dev);
 	pm_runtime_dont_use_autosuspend(dev);
+
+	wcd937x_enable_supplies(wcd937x, false);
 }
 
 #if defined(CONFIG_OF)
@@ -2997,6 +3075,7 @@ static struct platform_driver wcd937x_codec_driver = {
 	.driver = {
 		.name = "wcd937x_codec",
 		.of_match_table = of_match_ptr(wcd937x_of_match),
+		.pm = pm_ptr(&wcd937x_pm_ops),
 		.suppress_bind_attrs = true,
 	},
 };
