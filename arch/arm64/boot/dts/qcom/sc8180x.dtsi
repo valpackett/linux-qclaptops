@@ -2233,8 +2233,8 @@
 
 			interconnects = <&aggre1_noc MASTER_UFS_MEM QCOM_ICC_TAG_ALWAYS
 					 &mc_virt SLAVE_EBI_CH0 QCOM_ICC_TAG_ALWAYS>,
-					<&gem_noc MASTER_AMPSS_M0 QCOM_ICC_TAG_ALWAYS
-					 &config_noc SLAVE_UFS_MEM_0_CFG QCOM_ICC_TAG_ALWAYS>;
+					<&gem_noc MASTER_AMPSS_M0 QCOM_ICC_TAG_ACTIVE_ONLY
+					 &config_noc SLAVE_UFS_MEM_0_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
 			interconnect-names = "ufs-ddr", "cpu-ufs";
 
 			status = "disabled";
@@ -3004,8 +3004,8 @@
 					 &mc_virt SLAVE_EBI_CH0 QCOM_ICC_TAG_ALWAYS>,
 					<&mmss_noc MASTER_MDP_PORT1 QCOM_ICC_TAG_ALWAYS
 					 &mc_virt SLAVE_EBI_CH0 QCOM_ICC_TAG_ALWAYS>,
-					<&gem_noc MASTER_AMPSS_M0 QCOM_ICC_TAG_ALWAYS
-					 &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ALWAYS>;
+					<&gem_noc MASTER_AMPSS_M0 QCOM_ICC_TAG_ACTIVE_ONLY
+					 &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
 			interconnect-names = "mdp0-mem",
 					     "mdp1-mem",
 					     "cpu-cfg";
