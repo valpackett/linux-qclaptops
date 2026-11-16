@@ -15,6 +15,7 @@
 #include <linux/delay.h>
 #include <linux/nfc.h>
 #include <linux/of.h>
+#include <linux/pm_runtime.h>
 #include <linux/property.h>
 #include <linux/regulator/consumer.h>
 
@@ -48,13 +49,65 @@ struct st_nci_i2c_phy {
 	bool raw_nci;
 
 	struct gpio_desc *gpiod_reset;
+	struct regulator *vddio;
+	struct clk *clk;
 
 	struct st_nci_se_status se_status;
 };
 
+static int st_nci_i2c_power_on(struct st_nci_i2c_phy *phy)
+{
+	int r;
+
+	if (phy->vddio) {
+		r = regulator_enable(phy->vddio);
+		if (r)
+			return r;
+	}
+
+	if (phy->clk) {
+		r = clk_prepare_enable(phy->clk);
+		if (r) {
+			if (phy->vddio)
+				regulator_disable(phy->vddio);
+			return r;
+		}
+	}
+
+	return 0;
+}
+
+static void st_nci_i2c_power_off(struct st_nci_i2c_phy *phy)
+{
+	/*
+	 * Hold the chip in reset (existing DTS: logical 0 = disabled) before the
+	 * reference clock and the I/O supply are taken away.
+	 */
+	gpiod_set_value_cansleep(phy->gpiod_reset,
+				 gpiod_is_active_low(phy->gpiod_reset));
+
+	if (phy->clk)
+		clk_disable_unprepare(phy->clk);
+
+	if (phy->vddio)
+		regulator_disable(phy->vddio);
+}
+
 static int st_nci_i2c_enable(void *phy_id)
 {
 	struct st_nci_i2c_phy *phy = phy_id;
+	int r;
+
+	/*
+	 * ndlc_open() calls this with ndlc->powered cleared, ndlc_close() calls
+	 * it again (still powered) only to reset the chip, so only take a
+	 * runtime PM reference for the former.
+	 */
+	if (!phy->ndlc->powered) {
+		r = pm_runtime_resume_and_get(&phy->i2c_dev->dev);
+		if (r < 0)
+			return r;
+	}
 
 	/*
 	 * Existing DTS uses GPIO_ACTIVE_HIGH and treats logical 1 as
@@ -62,17 +115,17 @@ static int st_nci_i2c_enable(void *phy_id)
 	 * (physical LOW).
 	 */
 	if (gpiod_is_active_low(phy->gpiod_reset)) {
-		gpiod_set_value(phy->gpiod_reset, 1);
+		gpiod_set_value_cansleep(phy->gpiod_reset, 1);
 		usleep_range(10000, 15000);
-		gpiod_set_value(phy->gpiod_reset, 0);
+		gpiod_set_value_cansleep(phy->gpiod_reset, 0);
 	} else {
-		gpiod_set_value(phy->gpiod_reset, 0);
+		gpiod_set_value_cansleep(phy->gpiod_reset, 0);
 		usleep_range(10000, 15000);
-		gpiod_set_value(phy->gpiod_reset, 1);
+		gpiod_set_value_cansleep(phy->gpiod_reset, 1);
 	}
 	usleep_range(80000, 85000);
 
-	if (phy->ndlc->powered == 0 && phy->irq_active == 0) {
+	if (!phy->ndlc->powered && !phy->irq_active) {
 		enable_irq(phy->i2c_dev->irq);
 		phy->irq_active = true;
 	}
@@ -86,7 +139,34 @@ static void st_nci_i2c_disable(void *phy_id)
 
 	disable_irq_nosync(phy->i2c_dev->irq);
 	phy->irq_active = false;
+
+	/*
+	 * Power the chip down for real: runtime suspend asserts the reset line
+	 * and gates the clock and the I/O supply.
+	 */
+	pm_runtime_put_sync(&phy->i2c_dev->dev);
 }
+
+static int st_nci_i2c_runtime_resume(struct device *dev)
+{
+	struct st_nci_i2c_phy *phy = dev_get_drvdata(dev);
+
+	return st_nci_i2c_power_on(phy);
+}
+
+static int st_nci_i2c_runtime_suspend(struct device *dev)
+{
+	struct st_nci_i2c_phy *phy = dev_get_drvdata(dev);
+
+	st_nci_i2c_power_off(phy);
+
+	return 0;
+}
+
+static const struct dev_pm_ops st_nci_i2c_pm_ops = {
+	RUNTIME_PM_OPS(st_nci_i2c_runtime_suspend, st_nci_i2c_runtime_resume,
+		       NULL)
+};
 
 /*
  * Writing a frame must not return the number of written bytes.
@@ -245,7 +325,17 @@ static irqreturn_t st_nci_irq_thread_fn(int irq, void *phy_id)
 		return IRQ_HANDLED;
 
 	if (!phy->ndlc->powered) {
-		st_nci_i2c_disable(phy);
+		struct sk_buff *skb = NULL;
+
+		/*
+		 * The chip can raise an interrupt while it boots, before
+		 * ndlc_open() has marked the transport as powered. Drain the stale
+		 * frame so the level-triggered line deasserts again, but do not
+		 * touch the power state: runtime PM owns it.
+		 */
+		st_nci_i2c_read(phy, &skb);
+		kfree_skb(skb);
+
 		return IRQ_HANDLED;
 	}
 
@@ -296,13 +386,19 @@ static int st_nci_i2c_probe(struct i2c_client *client)
 	if (r)
 		dev_dbg(dev, "Unable to add GPIO mapping table\n");
 
-	r = devm_regulator_get_enable_optional(dev, "vdd-io");
-	if (r && r != -ENODEV)
-		return dev_err_probe(dev, r, "failed to enable vdd-io\n");
+	phy->vddio = devm_regulator_get_optional(dev, "vdd-io");
+	if (IS_ERR(phy->vddio)) {
+		r = PTR_ERR(phy->vddio);
+		if (r != -ENODEV)
+			return dev_err_probe(dev, r, "failed to get vdd-io\n");
 
-	r = PTR_ERR_OR_ZERO(devm_clk_get_optional_enabled(dev, NULL));
-	if (r)
-		return dev_err_probe(dev, r, "failed to enable clock\n");
+		phy->vddio = NULL;
+	}
+
+	phy->clk = devm_clk_get_optional(dev, NULL);
+	if (IS_ERR(phy->clk))
+		return dev_err_probe(dev, PTR_ERR(phy->clk),
+				     "failed to get clock\n");
 
 	/* Get RESET GPIO */
 	phy->gpiod_reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
@@ -331,17 +427,31 @@ static int st_nci_i2c_probe(struct i2c_client *client)
 				st_nci_irq_thread_fn,
 				IRQF_ONESHOT,
 				ST_NCI_DRIVER_NAME, phy);
-	if (r < 0)
+	if (r < 0) {
 		nfc_err(&client->dev, "Unable to register IRQ handler\n");
+		return r;
+	}
 
-	return r;
+	/*
+	 * The chip is held in reset until the first ndlc_open(), so start out
+	 * runtime suspended; ->enable() resumes it.
+	 */
+	pm_runtime_enable(dev);
+
+	return 0;
 }
 
 static void st_nci_i2c_remove(struct i2c_client *client)
 {
 	struct st_nci_i2c_phy *phy = i2c_get_clientdata(client);
 
+	pm_runtime_disable(&client->dev);
+
 	ndlc_remove(phy->ndlc);
+
+	/* Runtime PM may have powered the chip down already */
+	if (!pm_runtime_status_suspended(&client->dev))
+		st_nci_i2c_power_off(phy);
 }
 
 static const struct i2c_device_id st_nci_i2c_id_table[] = {
@@ -372,6 +482,7 @@ static struct i2c_driver st_nci_i2c_driver = {
 		.name = ST_NCI_I2C_DRIVER_NAME,
 		.of_match_table = of_match_ptr(of_st_nci_i2c_match),
 		.acpi_match_table = ACPI_PTR(st_nci_i2c_acpi_match),
+		.pm = &st_nci_i2c_pm_ops,
 	},
 	.probe = st_nci_i2c_probe,
 	.id_table = st_nci_i2c_id_table,
