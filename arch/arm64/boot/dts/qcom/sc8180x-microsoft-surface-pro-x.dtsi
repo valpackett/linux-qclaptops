@@ -415,6 +415,13 @@
 			};
 		};
 
+		port@2 {
+			csiphy2_ep: endpoint {
+				data-lanes = <0 1 2 3>;
+				remote-endpoint = <&ov13858_ep>;
+			};
+		};
+
 		port@3 {
 			csiphy3_lane0_ep: endpoint {
 				clock-lanes = <7>;
@@ -430,8 +437,60 @@
 };
 
 &cci0_i2c0 {
-	// unknown@0c
-	// unknown@50
+#ifdef NOTYET
+	// XXX: doesn't like being accessed when camera itself is not streaming??
+	dw9800k_ov13858: camera-lens@c {
+		compatible = "dongwoon,dw9800k";
+		reg = <0x0c>;
+
+		vdd-supply = <&vreg_l17a_2p85>;
+
+		dongwoon,sac-mode = <1>;
+		dongwoon,vcm-prescale = <16>;
+	};
+#endif
+
+	sensor@10 {
+		compatible = "ovti,ov13858";
+		reg = <0x10>;
+
+		avdd-supply = <&vreg_l17a_2p85>;
+		dovdd-supply = <&vreg_l14a_1p8>;
+		dvdd-supply = <&vreg_l1a_1p2>;
+
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&cam_mclk0_active &cam_rear_active>;
+		pinctrl-1 = <&cam_mclk0_suspend &cam_rear_suspend>;
+
+		clocks = <&camcc CAM_CC_MCLK0_CLK>;
+		assigned-clocks = <&camcc CAM_CC_MCLK0_CLK>;
+		assigned-clock-rates = <19200000>;
+
+		/* CAM_REAR_PWRDN_N, functions as inverted reset */
+		reset-gpios = <&tlmm 22 GPIO_ACTIVE_LOW>;
+
+		orientation = <MEDIA_ORIENTATION_BACK>;
+		rotation = <180>;
+
+		// lens-focus = <&dw9800k_ov13858>;
+
+		port {
+			ov13858_ep: endpoint {
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <540000000 270000000>;
+				remote-endpoint = <&csiphy2_ep>;
+			};
+		};
+	};
+
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		vcc-supply = <&vreg_l14a_1p8>;
+		read-only;
+	};
+
 	sensor@60 {
 		compatible = "ovti,ov7251";
 		reg = <0x60>;
@@ -638,10 +697,24 @@
 		vdd_l7_l12_l14_l15-supply = <&vreg_s5a_2p04>;
 		vdd_l13_l16_l17-supply = <&vreg_bob>;
 
+		vreg_l1a_1p2: l1 {
+			regulator-name = "vreg_l1a_1p2";
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-enable-ramp-delay = <10000>;
+		};
+
 		vreg_l14a_1p8: l14 {
 			regulator-name = "vreg_l14a_1p8";
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
+			regulator-enable-ramp-delay = <10000>;
+		};
+
+		vreg_l17a_2p85: l17 {
+			regulator-name = "vreg_l17a_2p85";
+			regulator-min-microvolt = <2848000>;
+			regulator-max-microvolt = <2848000>;
 			regulator-enable-ramp-delay = <10000>;
 		};
 	};
@@ -852,6 +925,22 @@
 		output-low;
 	};
 
+	cam_mclk0_active: cam_mclk0_active {
+		pins = "gpio13";
+		function = "cam_mclk";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_mclk0_suspend: cam_mclk0_suspend {
+		pins = "gpio13";
+		function = "cam_mclk";
+
+		bias-pull-down;
+		drive-strength = <2>;
+	};
+
 	cam_mclk2_active: cam_mclk2_active {
 		pins = "gpio15";
 		function = "cam_mclk";
@@ -882,6 +971,23 @@
 
 		bias-pull-down;
 		drive-strength = <2>;
+	};
+
+	cam_rear_active: cam-rear-active-state {
+		pins = "gpio22";
+		function = "gpio";
+
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	cam_rear_suspend: cam-rear-suspend-state {
+		pins = "gpio22";
+		function = "gpio";
+
+		bias-pull-down;
+		drive-strength = <2>;
+		output-low;
 	};
 
 	cam_ir_active: cam-ir-active-state {
