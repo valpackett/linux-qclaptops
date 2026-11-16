@@ -2687,10 +2687,14 @@ int ath11k_core_init(struct ath11k_base *ab)
 	int ret;
 
 	dmi_id = dmi_first_match(ath11k_pm_quirk_table);
-	if (dmi_id)
+	if (dmi_id) {
 		ab->pm_policy = (kernel_ulong_t)dmi_id->driver_data;
-	else
+	} else if (ab->hw_params.smp2p_wow_exit) {
+		ab->pm_policy = ATH11K_PM_WOW;
+		device_init_wakeup(ab->dev, true);
+	} else {
 		ab->pm_policy = ATH11K_PM_DEFAULT;
+	}
 
 	ath11k_dbg(ab, ATH11K_DBG_BOOT, "pm policy %u\n", ab->pm_policy);
 
