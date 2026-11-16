@@ -1149,10 +1149,11 @@ static int ath11k_core_continue_suspend_resume(struct ath11k_base *ab)
 	 * so pass 0 as a dummy pdev_id here.
 	 */
 	ar = ab->pdevs[0].ar;
-	if (!ar || ar->state != ATH11K_STATE_OFF)
+	if (!ar)
 		return 0;
 
-	return 1;
+	return ab->actual_pm_policy == ATH11K_PM_WOW ||
+		ar->state == ATH11K_STATE_OFF;
 }
 
 static int ath11k_core_suspend_wow(struct ath11k_base *ab)
