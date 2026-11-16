@@ -161,7 +161,7 @@ static int st_nci_i2c_read(struct st_nci_i2c_phy *phy,
 		}
 
 		len = buf[2];
-		if (len > ST_NCI_I2C_MAX_SIZE) {
+		if (len > ST_NCI_I2C_MAX_SIZE - ST_NCI_NCI_HDR_SIZE) {
 			nfc_err(&client->dev, "invalid frame len\n");
 			return -EBADMSG;
 		}
