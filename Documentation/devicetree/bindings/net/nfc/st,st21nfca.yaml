@@ -33,6 +33,9 @@ properties:
       Specifies that the uicc swp signal can be physically connected to the
       controller
 
+  vddio-supply:
+    description: Regulator providing the I/O supply of the controller
+
 required:
   - compatible
   - enable-gpios
@@ -57,6 +60,7 @@ examples:
             interrupt-parent = <&gpio5>;
             interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
             enable-gpios = <&gpio5 29 GPIO_ACTIVE_HIGH>;
+            vddio-supply = <&vreg_nfc_io>;
 
             ese-present;
             uicc-present;
